@@ -65,8 +65,11 @@ function LuaExportStart()
 end
 
 function LuaExportStop()
-    client_instance:shutdown()
-    log.write("HEMMECS.EXPORT", log.INFO, "Disconnected")
+    if client_instance ~= nil then
+        client_instance:shutdown()
+        log.write("HEMMECS.EXPORT", log.INFO, "Disconnected")
+    end
+    log.write("HEMMECS.EXPORT", log.INFO, "Stopped")
 end
 
 function LuaExportAfterNextFrame()
