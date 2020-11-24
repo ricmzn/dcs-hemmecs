@@ -24,6 +24,8 @@ Demonstration: https://www.youtube.com/watch?v=HJA8nITgAQY
 
 * Run `dcs-hemmecs.exe`
 
+* To close: either focus the application (click it in the taskbar or alt-tab into it) and press esc, or close it in task manager
+
 # FAQ
 
 Q: Does this pass IC?  
@@ -42,5 +44,7 @@ Q: Can I use this in VR?
 A: Not yet, sorry. It would need to ouput the image to a compositor layer such as SteamVR instead of a desktop window.
 
 # Known issues
+
+* The application may hang in the background after closing it
 
 * The code is bad and it doesn't deal with any edge cases, occupied ports, multi-monitor support, etc
