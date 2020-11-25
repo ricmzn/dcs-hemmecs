@@ -230,6 +230,10 @@ fn reader_thread(data_handle: Arc<Mutex<FlightData>>, quit: &AtomicBool) {
                         }
                     }
                 }
+                Err(err) if err.kind() == ErrorKind::ConnectionReset => {
+                    println!("Warning: DCS disconnected suddenly, did something happen? (Check dcs.log)");
+                    sleep(Duration::from_millis(500))
+                },
                 Err(err) if err.kind() == ErrorKind::ConnectionRefused => {
                     sleep(Duration::from_millis(500))
                 }
