@@ -12,7 +12,9 @@ Demonstration: https://www.youtube.com/watch?v=HJA8nITgAQY
 
 * Enter the `%userprofile%\Saved Games\DCS` or `%userprofile%\Saved Games\DCS.openbeta` folder
 
-* (First install only) Edit the `Scripts\Export.lua` file to insert the following line at the end: `pcall(function() local lfs=require('lfs'); dofile(lfs.writedir()..'Scripts/HemmecsExport.lua'); end, nil);`
+* (First install only) Edit the `Scripts\Export.lua` file to insert the following two lines at the end:  
+`local hemmecs, hemmecsErr = pcall(function() local hemmecsLfs=require('lfs'); dofile(hemmecsLfs.writedir()..'Scripts/HemmecsExport.lua'); end);`  
+`if not hemmecs then log.write("HEMMECS.EXPORT", log.ERROR, hemmecsErr) end;`
 
 * Extract the `Scripts\HemmecsExport.lua` file from the release into the `Scripts` folder
 
