@@ -1,4 +1,5 @@
-local client_instance = nil
+client = nil
+server = nil
 
 package.path  = package.path..";"..lfs.currentdir().."/LuaSocket/?.lua"
 package.cpath = package.cpath..";"..lfs.currentdir().."/LuaSocket/?.dll"
@@ -6,7 +7,7 @@ socket = require("socket")
 
 log.write("HEMMECS.EXPORT", log.INFO, "Loaded")
 
-function exportData(client)
+function exportData()
     local t = LoGetModelTime()
     local ias = LoGetIndicatedAirSpeed()
     local mach = LoGetMachNumber()
@@ -23,62 +24,50 @@ function exportData(client)
     )
 end
 
-function server()
-    local tcp = socket.tcp()
-    tcp:bind("127.0.0.1", 28561)
-    local status, error = tcp:listen(1)
-    if status == nil then
-        log.write("HEMMECS.EXPORT", log.ERROR, "Could not listen for connections: "..error)
-        return
-    end
-    tcp:setoption('keepalive', true)
-    tcp:setoption('tcp-nodelay', true)
-    tcp:settimeout(0)
-    log.write("HEMMECS.EXPORT", log.INFO, "Listening for connections")
-    local client = nil
-    while true do
-        if client == nil then
-            local client, error = tcp:accept()
-            if error ~= nil and error ~= "timeout" then
-                log.write("HEMMECS.EXPORT", log.ERROR, "Failed to accept connection: "..error)
-                break
-            end
-            if client ~= nil then
-                log.write("HEMMECS.EXPORT", log.INFO, "Connected")
-                client_instance = client
-            end
-        end
-        coroutine.yield()
-    end
-end
-
-serverCoroutine = coroutine.create(server)
-
-function CoroutineResume(index, tCurrent)
-	coroutine.resume(serverCoroutine, tCurrent)
-	return coroutine.status(serverCoroutine) ~= "dead"
+function disconnect()
+    client:shutdown()
+    client = nil
+    log.write("HEMMECS.EXPORT", log.INFO, "Disconnected")
 end
 
 function LuaExportStart()
-    LoCreateCoroutineActivity(0, 1.0, 1.0)
     log.write("HEMMECS.EXPORT", log.INFO, "Started")
+    server = socket.tcp()
+    server:bind("127.0.0.1", 28561)
+    local success, error = server:listen(1)
+    if success == nil then
+        log.write("HEMMECS.EXPORT", log.ERROR, "Could not listen for connections: "..error)
+        return
+    end
+    server:setoption('keepalive', true)
+    server:setoption('tcp-nodelay', true)
+    server:settimeout(0)
+    log.write("HEMMECS.EXPORT", log.INFO, "Listening for connections")
 end
 
 function LuaExportStop()
-    if client_instance ~= nil then
-        client_instance:shutdown()
-        log.write("HEMMECS.EXPORT", log.INFO, "Disconnected")
+    if client ~= nil then
+        disconnect(client)
     end
     log.write("HEMMECS.EXPORT", log.INFO, "Stopped")
 end
 
 function LuaExportAfterNextFrame()
-    if client_instance ~= nil then
-        local status, error = exportData(client_instance)
+    if client == nil and server ~= nil then
+        local error
+        client, error = server:accept()
+        if error ~= nil and error ~= "timeout" then
+            log.write("HEMMECS.EXPORT", log.ERROR, "Failed to accept connection: "..error)
+        end
+        if client ~= nil then
+            log.write("HEMMECS.EXPORT", log.INFO, "Connected")
+        end
+    end
+    if client ~= nil then
+        local status, error = exportData()
         if error ~= nil then
             log.write("HEMMECS.EXPORT", log.ERROR, "Error sending message: "..error)
-            client_instance:shutdown()
-            client_instance = nil
+            disconnect()
         end
     end
 end
