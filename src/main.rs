@@ -129,9 +129,9 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
                 // Format text information
                 let text = format!(
                     "{}\n{}\n\n\n\n\n\n\n\n{}\n{}\n{}",
-                    format!("             {:0>3.0}         ", fd.yaw.to_degrees()),
+                    format!("              {:0>3.0}         ", fd.yaw.to_degrees()),
                     format!(
-                        "[{:>3.0}]                    [{:>5.0}]",
+                        "[{:>3.0}]                   [{:>5.0}]",
                         fd.ias * 1.943844, // m/s -> kn
                         fd.alt * 3.28084   // m -> ft
                     ),
