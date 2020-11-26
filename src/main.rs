@@ -10,6 +10,7 @@ use std::io::{BufRead, BufReader};
 use std::mem;
 use std::net::TcpStream;
 use std::panic::catch_unwind;
+use std::pin::Pin;
 use std::ptr::null_mut as NULL;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -72,7 +73,7 @@ struct WindowData {
     font: RefCell<Font>,
 }
 
-type WindowDataRef = RefCell<WindowData>;
+type WindowDataRef = Pin<Box<WindowData>>;
 
 const FONT: &[u8] = include_bytes!("../fonts/Inconsolata-SemiBold.ttf");
 
@@ -116,7 +117,6 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
             if let Some(data) = data.as_ref() {
                 let mut ps: PAINTSTRUCT = mem::zeroed();
                 let hdc = BeginPaint(hwnd, &mut ps as *mut _);
-                let data = data.borrow();
 
                 let fd = { data.flight_data.lock().unwrap().clone() };
                 let mut dt = data.draw_target.borrow_mut();
@@ -231,9 +231,11 @@ fn reader_thread(data_handle: Arc<Mutex<FlightData>>, quit: &AtomicBool) {
                     }
                 }
                 Err(err) if err.kind() == ErrorKind::ConnectionReset => {
-                    println!("Warning: DCS disconnected suddenly, did something happen? (Check dcs.log)");
+                    println!(
+                        "Warning: DCS disconnected suddenly, did something happen? (Check dcs.log)"
+                    );
                     sleep(Duration::from_millis(500))
-                },
+                }
                 Err(err) if err.kind() == ErrorKind::ConnectionRefused => {
                     sleep(Duration::from_millis(500))
                 }
@@ -271,14 +273,14 @@ fn main() {
 
     let quit = AtomicBool::new(false);
 
-    let data: WindowDataRef = RefCell::new(WindowData {
+    let data: WindowDataRef = Box::pin(WindowData {
         flight_data: Arc::new(Mutex::new(FlightData::default())),
         draw_target: RefCell::new(DrawTarget::new(WIDTH, HEIGHT)),
         font: RefCell::new(font),
     });
 
     scope(|s| {
-        let fd = Arc::clone(&data.borrow().flight_data);
+        let fd = Arc::clone(&data.flight_data);
         s.spawn(|_| reader_thread(fd, &quit));
         unsafe {
             RegisterClassA(&window_class);
