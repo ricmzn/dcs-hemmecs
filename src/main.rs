@@ -108,7 +108,7 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
 
                 // Format text information
                 let text = format!(
-                    "{}\n{}\n\n\n\n\n\n\n\n{}\n{}\n{}",
+                    "{}\n{}\n\n\n\n\n\n\n\n\n\n\n\n{}\n{}\n{}",
                     format!("                   {:0>3.0}", fd.yaw.to_degrees()),
                     format!(
                         "[{:>3.0}]                              [{:>5.0}]",
