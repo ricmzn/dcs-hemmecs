@@ -55,10 +55,10 @@ struct WindowData {
 
 type WindowDataRef = Pin<Box<WindowData>>;
 
-const FONT: &[u8] = include_bytes!("../fonts/Inconsolata-SemiBold.ttf");
-
 const WIDTH: i32 = 1024;
 const HEIGHT: i32 = 768;
+const FONT: &[u8] = include_bytes!("../fonts/Inconsolata-SemiBold.ttf");
+const FONT_SIZE: f32 = 48.0;
 
 const COLORS: RGBQUAD = RGBQUAD {
     rgbRed: 0xff,
@@ -109,9 +109,9 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
                 // Format text information
                 let text = format!(
                     "{}\n{}\n\n\n\n\n\n\n\n{}\n{}\n{}",
-                    format!("              {:0>3.0}         ", fd.yaw.to_degrees()),
+                    format!("                   {:0>3.0}", fd.yaw.to_degrees()),
                     format!(
-                        "[{:>3.0}]                   [{:>5.0}]",
+                        "[{:>3.0}]                              [{:>5.0}]",
                         fd.ias * 1.943844, // m/s -> kn
                         fd.alt * 3.28084   // m -> ft
                     ),
@@ -123,7 +123,7 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
                 // Draw text on the canvas
                 dt.draw_glyphs(
                     &font,
-                    64.0,
+                    FONT_SIZE,
                     &text
                         .chars()
                         .map(|c| font.glyph_for_char(c).unwrap_or_default())
@@ -132,16 +132,16 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
                         .chars()
                         .map({
                             let x = Cell::new(0.0);
-                            let y = Cell::new(64.0);
+                            let y = Cell::new(FONT_SIZE);
                             move |c| {
                                 let p = Point::new(x.get(), y.get());
                                 if c == '\n' {
                                     // One line = 64px
-                                    x.replace(32.0);
-                                    y.replace(y.get() + 64.0);
+                                    x.replace(0.0);
+                                    y.replace(y.get() + FONT_SIZE);
                                 } else {
                                     // One char = 32px
-                                    x.replace(x.get() + 32.0);
+                                    x.replace(x.get() + FONT_SIZE / 2.0);
                                 }
                                 p
                             }
