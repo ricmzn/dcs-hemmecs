@@ -47,6 +47,8 @@ A: Not yet, sorry. It would need to ouput the image to a compositor layer such a
 
 # Known issues
 
+* Versions 0.1.0 and 0.2.0 break TacView exports (sorry!)
+
 * The application may hang in the background after closing it
 
 * The code is bad and it doesn't deal with any edge cases, occupied ports, multi-monitor support, etc
