@@ -37,7 +37,12 @@ function disconnect()
     info("Disconnected")
 end
 
+local previousLuaExportStart = LuaExportStart
+local previousLuaExportStop = LuaExportStop
+local previousLuaExportAfterNextFrame = LuaExportAfterNextFrame
+
 function LuaExportStart()
+    previousLuaExportStart()
     info("Started")
     server = socket.tcp()
     server:bind("127.0.0.1", 28561)
@@ -53,6 +58,7 @@ function LuaExportStart()
 end
 
 function LuaExportStop()
+    previousLuaExportStop()
     if client ~= nil then
         disconnect()
     end
@@ -60,6 +66,7 @@ function LuaExportStop()
 end
 
 function LuaExportAfterNextFrame()
+    previousLuaExportAfterNextFrame()
     if client == nil and server ~= nil then
         local err
         client, err = server:accept()
