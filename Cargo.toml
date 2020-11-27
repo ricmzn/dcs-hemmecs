@@ -5,6 +5,8 @@ authors = ["Ricardo Maes <ricmzn@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
 winapi = { version = "0.3", features = ["libloaderapi", "winuser", "errhandlingapi"] }
 crossbeam = "0.8"
 font-kit = "0.7"

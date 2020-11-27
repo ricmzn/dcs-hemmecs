@@ -2,6 +2,7 @@ use crossbeam::scope;
 use font_kit::font::Font;
 use font_kit::handle::Handle;
 use raqote::{AntialiasMode, BlendMode, DrawOptions, DrawTarget, Point, SolidSource, Source};
+use serde::Deserialize;
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::ffi::CString;
@@ -23,7 +24,16 @@ use winapi::um::libloaderapi::*;
 use winapi::um::wingdi::*;
 use winapi::um::winuser::*;
 
-#[derive(Debug, Clone, Default)]
+#[serde(default)]
+#[derive(Debug, Clone, Default, Deserialize)]
+struct Position {
+    x: f32,
+    y: f32,
+    z: f32,
+}
+
+#[serde(default)]
+#[derive(Debug, Clone, Default, Deserialize)]
 struct FlightData {
     time: f32,
     ias: f32,
@@ -31,40 +41,10 @@ struct FlightData {
     alt: f32,
     rad_alt: f32,
     pitch: f32,
-    roll: f32,
+    bank: f32,
     yaw: f32,
     aoa: f32,
-    g: (f32, f32, f32),
-}
-
-impl FlightData {
-    fn from_line(line: &str) -> FlightData {
-        let mut data = FlightData::default();
-        line.split(",").for_each(|kv| {
-            let mut kv = kv.split("=");
-            if let Some(key) = kv.next() {
-                if let Some(value) = kv.next() {
-                    let value = value.parse().unwrap_or(f32::NAN);
-                    match key {
-                        "t" => data.time = value,
-                        "ias" => data.ias = value,
-                        "mach" => data.mach = value,
-                        "alt" => data.alt = value,
-                        "radalt" => data.rad_alt = value,
-                        "pitch" => data.pitch = value,
-                        "roll" => data.roll = value,
-                        "yaw" => data.yaw = value,
-                        "aoa" => data.aoa = value,
-                        "g.x" => data.g.0 = value,
-                        "g.y" => data.g.1 = value,
-                        "g.z" => data.g.2 = value,
-                        _ => (),
-                    }
-                }
-            }
-        });
-        data
-    }
+    g: Position,
 }
 
 struct WindowData {
@@ -136,7 +116,7 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
                         fd.alt * 3.28084   // m -> ft
                     ),
                     format!("M {:.2}", fd.mach),
-                    format!("G {:.1}", fd.g.1),
+                    format!("G {:.1}", fd.g.y),
                     format!("a {:.1}", fd.aoa)
                 );
 
@@ -221,10 +201,11 @@ fn reader_thread(data_handle: Arc<Mutex<FlightData>>, quit: &AtomicBool) {
                     let mut lines = BufReader::new(stream).lines();
                     while quit.load(Ordering::Relaxed) == false {
                         let line = lines.next();
+                        let mut data = data_handle.lock().unwrap();
                         if let Some(line) = line {
-                            *data_handle.lock().unwrap() = FlightData::from_line(&line.unwrap());
+                            *data = serde_json::from_str(&line.unwrap()).unwrap();
                         } else {
-                            *data_handle.lock().unwrap() = FlightData::default();
+                            *data = FlightData::default();
                             println!("DCS disconnected, waiting for mission restart");
                             break;
                         }
