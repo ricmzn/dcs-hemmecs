@@ -1,7 +1,10 @@
 use crossbeam::scope;
 use font_kit::font::Font;
 use font_kit::handle::Handle;
-use raqote::{AntialiasMode, BlendMode, DrawOptions, DrawTarget, Point, SolidSource, Source};
+use raqote::{
+    AntialiasMode, BlendMode, Color, DrawOptions, DrawTarget, PathBuilder, Point, SolidSource,
+    Source, StrokeStyle,
+};
 use serde::Deserialize;
 use std::cell::Cell;
 use std::cell::RefCell;
@@ -24,6 +27,11 @@ use winapi::um::libloaderapi::*;
 use winapi::um::wingdi::*;
 use winapi::um::winuser::*;
 
+#[derive(Debug, Clone, Default)]
+struct CockpitParams {
+    ejected: bool,
+}
+
 #[serde(default)]
 #[derive(Debug, Clone, Default, Deserialize)]
 struct Position {
@@ -35,6 +43,7 @@ struct Position {
 #[serde(default)]
 #[derive(Debug, Clone, Default, Deserialize)]
 struct FlightData {
+    cp_params: Option<String>,
     time: f32,
     ias: f32,
     mach: f32,
@@ -45,6 +54,35 @@ struct FlightData {
     yaw: f32,
     aoa: f32,
     g: Position,
+}
+
+impl FlightData {
+    fn parse_cockpit_params(&self) -> Option<CockpitParams> {
+        self.cp_params.as_ref().map(|params_raw| {
+            let mut params = CockpitParams::default();
+            // DCS undocumented cockpit param format
+            // Each parameter is separated by a line break,
+            // and is presented in the format Key:Value
+            for param in params_raw.split("\n") {
+                let mut key_value = param.split(":");
+                if let Some(key) = key_value.next() {
+                    if let Some(value) = key_value.next() {
+                        match key {
+                            "EJECTION_INITIATED_0" => {
+                                // (Undocumented) values:
+                                // -1: not ejected
+                                // >1: ejecting
+                                // 0: pilot absent or dead
+                                params.ejected = value.parse::<f32>().unwrap_or(-1.0) >= 0.0;
+                            }
+                            _ => (),
+                        }
+                    }
+                }
+            }
+            params
+        })
+    }
 }
 
 struct WindowData {
@@ -59,6 +97,25 @@ const WIDTH: i32 = 1024;
 const HEIGHT: i32 = 768;
 const FONT: &[u8] = include_bytes!("../fonts/Inconsolata-SemiBold.ttf");
 const FONT_SIZE: f32 = 48.0;
+const TEXT_OFFSET_Y: f32 = FONT_SIZE * 5.0 / 6.0;
+
+const DRAW_OPTIONS: DrawOptions = DrawOptions {
+    antialias: AntialiasMode::None,
+    blend_mode: BlendMode::Src,
+    alpha: 1.0,
+};
+
+fn background() -> SolidSource {
+    Color::new(255, 0, 0, 0).into()
+}
+
+fn red() -> Source<'static> {
+    Color::new(255, 255, 0, 0).into()
+}
+
+fn green() -> Source<'static> {
+    Color::new(255, 0, 255, 0).into()
+}
 
 const COLORS: RGBQUAD = RGBQUAD {
     rgbRed: 0xff,
@@ -102,23 +159,27 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
                 let mut dt = data.draw_target.borrow_mut();
                 let font = data.font.borrow();
 
-                dt.clear(SolidSource::from_unpremultiplied_argb(
-                    0xff, 0x00, 0x00, 0x00,
-                ));
+                dt.clear(background());
+
+                let cp = fd.parse_cockpit_params().unwrap_or_default();
 
                 // Format text information
-                let text = format!(
-                    "{}\n{}\n\n\n\n\n\n\n\n\n\n\n\n{}\n{}\n{}",
-                    format!("                   {:0>3.0}", fd.yaw.to_degrees()),
+                let text = if !cp.ejected {
                     format!(
-                        "[{:>3.0}]                              [{:>5.0}]",
-                        fd.ias * 1.943844, // m/s -> kn
-                        fd.alt * 3.28084   // m -> ft
-                    ),
-                    format!("M {:.2}", fd.mach),
-                    format!("G {:.1}", fd.g.y),
-                    format!("a {:.1}", fd.aoa)
-                );
+                        "{}\n{}\n\n\n\n\n\n\n\n\n\n\n\n{}\n{}\n{}",
+                        format!("                   {:0>3.0}", fd.yaw.to_degrees()),
+                        format!(
+                            "[{:>3.0}]                              [{:>5.0}]",
+                            fd.ias * 1.943844, // m/s -> kn
+                            fd.alt * 3.28084   // m -> ft
+                        ),
+                        format!("M {:.2}", fd.mach),
+                        format!("G {:.1}", fd.g.y),
+                        format!("a {:.1}", fd.aoa)
+                    )
+                } else {
+                    format!("EJECTED")
+                };
 
                 // Draw text on the canvas
                 dt.draw_glyphs(
@@ -132,7 +193,7 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
                         .chars()
                         .map({
                             let x = Cell::new(0.0);
-                            let y = Cell::new(FONT_SIZE);
+                            let y = Cell::new(TEXT_OFFSET_Y);
                             move |c| {
                                 let p = Point::new(x.get(), y.get());
                                 if c == '\n' {
@@ -147,15 +208,24 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
                             }
                         })
                         .collect::<Vec<_>>(),
-                    &Source::Solid(SolidSource::from_unpremultiplied_argb(
-                        0xff, 0x00, 0xff, 0x00,
-                    )),
-                    &DrawOptions {
-                        blend_mode: BlendMode::Add,
-                        antialias: AntialiasMode::None,
-                        alpha: 1.0,
-                    },
+                    &green(),
+                    &DRAW_OPTIONS,
                 );
+
+                // Paint window border in case it's in focus
+                if GetFocus() == hwnd {
+                    let mut pb = PathBuilder::new();
+                    pb.rect(0.0, 0.0, WIDTH as f32, HEIGHT as f32);
+                    dt.stroke(
+                        &pb.finish(),
+                        &red(),
+                        &StrokeStyle {
+                            width: 4.0,
+                            ..Default::default()
+                        },
+                        &DRAW_OPTIONS,
+                    );
+                }
 
                 // Copy image data to window
                 StretchDIBits(
