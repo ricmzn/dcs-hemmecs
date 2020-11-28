@@ -1,10 +1,10 @@
-client = nil
-server = nil
+local client = nil
+local server = nil
 
 package.path  = package.path..";"..lfs.currentdir().."/LuaSocket/?.lua"
 package.cpath = package.cpath..";"..lfs.currentdir().."/LuaSocket/?.dll"
-socket = require("socket")
-json = require("json")
+local socket = require("socket")
+local json = require("json")
 
 function info(str)
     log.write("HEMMECS.EXPORT", log.INFO, str)
@@ -15,8 +15,10 @@ function error(str)
 end
 
 function exportData()
+    local cp_params = list_cockpit_params()
     local pitch, bank, yaw = LoGetADIPitchBankYaw()
     local data = json:encode({
+        cp_params = cp_params,
         time = LoGetModelTime(),
         ias = LoGetIndicatedAirSpeed(),
         mach = LoGetMachNumber(),
