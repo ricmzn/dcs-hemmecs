@@ -487,8 +487,7 @@ dependencies = [
 [[package]]
 name = "raqote"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "501c19caa439857ed7bea975fa4c3c10ee9a24e33c2640030c3ac14b58f39f77"
+source = "git+https://github.com/ricmzn/raqote.git?branch=0.8#6a49164d2cd7d42ee92d30ccee6137d8f382601c"
 dependencies = [
  "euclid",
  "font-kit",

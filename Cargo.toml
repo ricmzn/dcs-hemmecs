@@ -8,6 +8,6 @@ edition = "2018"
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 winapi = { version = "0.3", features = ["libloaderapi", "winuser", "errhandlingapi"] }
+raqote = { git = "https://github.com/ricmzn/raqote.git", branch = "0.8" }
 crossbeam = "0.8"
 font-kit = "0.7"
-raqote = "0.8"
