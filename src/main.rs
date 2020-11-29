@@ -42,6 +42,22 @@ struct Position {
 
 #[serde(default)]
 #[derive(Debug, Clone, Default, Deserialize)]
+struct EngineStat {
+    left: f32,
+    right: f32,
+}
+
+#[serde(default)]
+#[derive(Debug, Clone, Default, Deserialize)]
+#[allow(non_snake_case)]
+struct EngineData {
+    RPM: EngineStat,
+    fuel_internal: f32,
+    fuel_external: f32,
+}
+
+#[serde(default)]
+#[derive(Debug, Clone, Default, Deserialize)]
 struct FlightData {
     cp_params: Option<String>,
     time: f32,
@@ -54,6 +70,7 @@ struct FlightData {
     yaw: f32,
     aoa: f32,
     g: Position,
+    engine_data: Option<EngineData>,
 }
 
 impl FlightData {
@@ -175,7 +192,19 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
                         ),
                         format!("M {:.2}", fd.mach),
                         format!("G {:.1}", fd.g.y),
-                        format!("a {:.1}", fd.aoa)
+                        {
+                            let aoa_str = format!("a {:.1}", fd.aoa);
+                            if let Some(engine_data) = fd.engine_data {
+                                let fuel_str = format!(
+                                    "{:.0} lbs",
+                                    (engine_data.fuel_internal + engine_data.fuel_external)
+                                        * 2.204622622 // kg -> lb
+                                );
+                                format!("{0}{1:>2$}", aoa_str, fuel_str, 42 - aoa_str.len())
+                            } else {
+                                aoa_str
+                            }
+                        }
                     )
                 } else {
                     format!("EJECTED")
@@ -192,16 +221,14 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
                     &text
                         .chars()
                         .map({
-                            let x = Cell::new(0.0);
+                            let x = Cell::new(FONT_SIZE / 6.0);
                             let y = Cell::new(TEXT_OFFSET_Y);
                             move |c| {
                                 let p = Point::new(x.get(), y.get());
                                 if c == '\n' {
-                                    // One line = 64px
-                                    x.replace(0.0);
+                                    x.replace(FONT_SIZE / 6.0);
                                     y.replace(y.get() + FONT_SIZE);
                                 } else {
-                                    // One char = 32px
                                     x.replace(x.get() + FONT_SIZE / 2.0);
                                 }
                                 p

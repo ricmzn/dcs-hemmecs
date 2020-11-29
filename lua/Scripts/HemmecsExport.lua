@@ -29,6 +29,7 @@ function exportData()
         yaw = yaw,
         aoa = LoGetAngleOfAttack(),
         g = LoGetAccelerationUnits(),
+        engine_data = LoGetEngineInfo(),
     })
     return client:send(data.."\n")
 end
