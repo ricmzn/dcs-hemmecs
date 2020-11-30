@@ -1,3 +1,7 @@
+### Important Note
+
+Versions 0.1.0 and 0.2.0 have a critical bug that cause them to break SRS and TacView. Sorry!
+
 # Introduction
 
 This is a standalone application that runs alongside DCS (Digital Combat Simulator) to overlay important flight information (ie. speed, altitude, heading) on top of the game window, similar to real-life [Helmet-mounted displays](https://en.wikipedia.org/wiki/Helmet-mounted_display) such as the JHCMS in the F/A-18 and DASS in the Eurofighter Typhoon.
@@ -46,8 +50,6 @@ Q: Can I use this in VR?
 A: Not yet, sorry. It would need to ouput the image to a compositor layer such as SteamVR instead of a desktop window.
 
 # Known issues
-
-* Versions 0.1.0 and 0.2.0 break TacView exports (sorry!)
 
 * The application may hang in the background after closing it
 
