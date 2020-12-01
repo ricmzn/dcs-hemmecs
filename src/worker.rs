@@ -31,7 +31,10 @@ pub fn run_worker(data_handle: Arc<Mutex<FlightData>>, quit_signal: &AtomicBool)
                     }
                 }
                 // DCS closed connection
-                Err(err) if err.kind() == ErrorKind::ConnectionAborted => {
+                Err(err)
+                    if err.kind() == ErrorKind::ConnectionAborted
+                        || err.kind() == ErrorKind::ConnectionAborted =>
+                {
                     println!(
                         "Warning: DCS disconnected suddenly, did something happen? (Check dcs.log)"
                     );
