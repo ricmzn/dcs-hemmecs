@@ -13,7 +13,7 @@ use crate::{
     data::FlightData,
 };
 
-const WEAPON_CODE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?:\w+-)?(\w+)(?:\s.+)?").unwrap());
+const WEAPON_CODE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?:\w+[-.])?(\w+)(?:\s.+)?").unwrap());
 
 fn two_columns(left: &str, right: &str) -> String {
     format!(
