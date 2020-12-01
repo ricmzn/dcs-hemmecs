@@ -1,13 +1,28 @@
 use font_kit::font::Font;
+use once_cell::unsync::Lazy;
 use raqote::{DrawTarget, PathBuilder, Point, StrokeStyle};
+use regex::Regex;
 use std::cell::Cell;
 use winapi::shared::windef::HWND;
 use winapi::um::winuser::GetFocus;
 
 use crate::{
-    consts::{background, green, red, DRAW_OPTIONS, FONT_SIZE, HEIGHT, TEXT_OFFSET_Y, WIDTH},
+    consts::{
+        background, green, red, DRAW_OPTIONS, FONT_SIZE, HEIGHT, TEXT_COLUMNS, TEXT_OFFSET_Y, WIDTH,
+    },
     data::FlightData,
 };
+
+const WEAPON_CODE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?:\w+-)?(\w+)(?:\s.+)?").unwrap());
+
+fn two_columns(left: &str, right: &str) -> String {
+    format!(
+        "{left}{right:>padding$}",
+        left = left,
+        right = right,
+        padding = TEXT_COLUMNS as usize - left.len()
+    )
+}
 
 pub fn draw<'a>(
     hwnd: HWND,
@@ -29,8 +44,38 @@ pub fn draw<'a>(
                 data.ias * 1.943844, // m/s -> kn
                 data.alt * 3.28084   // m -> ft
             ),
-            format!("M {:.2}", data.mach),
-            format!("G {:.1}", data.g.y),
+            // 3rd line from bottom
+            {
+                let mach_str = format!("M {:.2}", data.mach);
+                if let Some(weapon) = &data.weapons {
+                    let weapon_str = if let Some(current) = &weapon.current {
+                        // Remove the prefix and suffix for brevity
+                        let short_name = WEAPON_CODE
+                            .captures(&current.name)
+                            .and_then(|captures| captures.get(1))
+                            .map(|m| m.as_str())
+                            .unwrap_or(&current.name);
+
+                        format!("{} {}", short_name, current.count)
+                    } else {
+                        String::new()
+                    };
+                    two_columns(&mach_str, &weapon_str)
+                } else {
+                    mach_str
+                }
+            },
+            // 2nd line from bottom
+            {
+                let g_str = format!("G {:.1}", data.g.y);
+                if let Some(weapon) = &data.weapons {
+                    let shells_str = format!("GUN {}", weapon.shells);
+                    two_columns(&g_str, &shells_str)
+                } else {
+                    g_str
+                }
+            },
+            // last line
             {
                 let aoa_str = format!("a {:.1}", data.aoa);
                 if let Some(engine_data) = &data.engine_data {
@@ -38,7 +83,7 @@ pub fn draw<'a>(
                         "{:.0} lbs",
                         (engine_data.fuel_internal + engine_data.fuel_external) * 2.204622622 // kg -> lb
                     );
-                    format!("{0}{1:>2$}", aoa_str, fuel_str, 42 - aoa_str.len())
+                    two_columns(&aoa_str, &fuel_str)
                 } else {
                     aoa_str
                 }

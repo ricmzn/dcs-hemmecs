@@ -14,9 +14,41 @@ function error(str)
     log.write("HEMMECS.EXPORT", log.ERROR, str)
 end
 
+function same_weapon(a, b)
+    return a.level1 == b.level1
+        and a.level2 == b.level2
+        and a.level3 == b.level3
+        and a.level4 == b.level4
+end
+
 function exportData()
     local cp_params = list_cockpit_params()
     local pitch, bank, yaw = LoGetADIPitchBankYaw()
+    local weapons = nil
+    local payload = LoGetPayloadInfo()
+    if payload ~= nil then
+        local selected = payload.Stations[payload.CurrentStation]
+        if selected ~= nil then
+            -- Manually count all weapons of the same type
+            local count = 0
+            for i, station in pairs(payload.Stations) do
+                if same_weapon(station.weapon, selected.weapon) then
+                    count = count + station.count
+                end
+            end
+            weapons = {
+                current = {
+                    name = LoGetNameByType(selected.weapon.level1, selected.weapon.level2, selected.weapon.level3, selected.weapon.level4),
+                    count = count,
+                },
+                shells = payload.Cannon.shells,
+            }
+        else
+            weapons = {
+                shells = payload.Cannon.shells,
+            }
+        end
+    end
     local data = json:encode({
         cp_params = cp_params,
         time = LoGetModelTime(),
@@ -29,7 +61,9 @@ function exportData()
         yaw = yaw,
         aoa = LoGetAngleOfAttack(),
         g = LoGetAccelerationUnits(),
+        cam = LoGetCameraPosition(),
         engine_data = LoGetEngineInfo(),
+        weapons = weapons
     })
     return client:send(data.."\n")
 end

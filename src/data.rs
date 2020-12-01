@@ -4,33 +4,59 @@ use serde::Deserialize;
 use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
 
-#[derive(Debug, Clone, Default)]
-pub struct CockpitParams {
-    pub ejected: bool,
-}
+pub mod dcs {
+    use super::*;
 
-#[serde(default)]
-#[derive(Debug, Clone, Default, Deserialize)]
-pub struct Position {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
-}
+    #[serde(default)]
+    #[derive(Debug, Clone, Default, Deserialize)]
+    pub struct Vec3 {
+        pub x: f32,
+        pub y: f32,
+        pub z: f32,
+    }
 
-#[serde(default)]
-#[derive(Debug, Clone, Default, Deserialize)]
-pub struct EngineStat {
-    pub left: f32,
-    pub right: f32,
-}
+    #[serde(default)]
+    #[derive(Debug, Clone, Default, Deserialize)]
+    pub struct Position {
+        /// Orientation x-vector
+        pub x: Vec3,
+        /// Orientation y-vector
+        pub y: Vec3,
+        /// Orientation z-vector
+        pub z: Vec3,
+        /// Position in world
+        pub p: Vec3,
+    }
 
-#[serde(default)]
-#[derive(Debug, Clone, Default, Deserialize)]
-#[allow(non_snake_case)]
-pub struct EngineData {
-    pub RPM: EngineStat,
-    pub fuel_internal: f32,
-    pub fuel_external: f32,
+    #[serde(default)]
+    #[derive(Debug, Clone, Default, Deserialize)]
+    pub struct EngineDetails {
+        pub left: f32,
+        pub right: f32,
+    }
+
+    #[serde(default)]
+    #[derive(Debug, Clone, Default, Deserialize)]
+    #[allow(non_snake_case)]
+    pub struct EngineData {
+        pub RPM: EngineDetails,
+        pub fuel_internal: f32,
+        pub fuel_external: f32,
+    }
+
+    #[serde(default)]
+    #[derive(Debug, Clone, Default, Deserialize)]
+    pub struct WeaponDetails {
+        pub name: String,
+        pub count: i32,
+    }
+
+    #[serde(default)]
+    #[derive(Debug, Clone, Default, Deserialize)]
+    pub struct WeaponData {
+        pub current: Option<WeaponDetails>,
+        pub shells: i32,
+    }
 }
 
 #[serde(default)]
@@ -46,8 +72,15 @@ pub struct FlightData {
     pub bank: f32,
     pub yaw: f32,
     pub aoa: f32,
-    pub g: Position,
-    pub engine_data: Option<EngineData>,
+    pub g: dcs::Vec3,
+    pub cam: dcs::Position,
+    pub engine_data: Option<dcs::EngineData>,
+    pub weapons: Option<dcs::WeaponData>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct CockpitParams {
+    pub ejected: bool,
 }
 
 impl FlightData {
