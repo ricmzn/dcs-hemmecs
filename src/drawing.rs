@@ -33,17 +33,31 @@ pub fn draw<'a>(
     draw_target.clear(background());
 
     let cp = data.parse_cockpit_params().unwrap_or_default();
+    let cv = data.camera_relative_vector();
+
+    let occluded = 
+        // HUD area
+        (cv.y.abs() < 0.2 && cv.z < 0.0 && cv.x > 0.0) ||
+        // Front dash
+        (cv.y.abs() < 0.4 && cv.z < -0.2 && cv.x > 0.0) ||
+        // Side consoles
+        (cv.z < -0.7);
 
     // Format text information
-    let text = if !cp.ejected {
+    let text = if cp.ejected {
+        String::from("EJECTED")
+    } else if occluded {
+        String::from("*")
+    } else {
         format!(
-            "{}\n{}\n\n\n\n\n\n\n\n\n\n\n\n{}\n{}\n{}",
+            "{}\n{}\n{}\n\n\n\n\n\n\n\n\n\n\n{}\n{}\n{}",
             format!("                   {:0>3.0}", data.yaw.to_degrees()),
             format!(
                 "[{:>3.0}]                              [{:>5.0}]",
                 data.ias * 1.943844, // m/s -> kn
                 data.alt * 3.28084   // m -> ft
             ),
+            format!("{:#?}", data.camera_relative_vector()),
             // 3rd line from bottom
             {
                 let mach_str = format!("M {:.2}", data.mach);
@@ -89,8 +103,6 @@ pub fn draw<'a>(
                 }
             }
         )
-    } else {
-        format!("EJECTED")
     };
 
     // Draw text on the canvas

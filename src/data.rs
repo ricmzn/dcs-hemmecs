@@ -1,4 +1,5 @@
 use font_kit::font::Font;
+use nalgebra::{Matrix3, Rotation3};
 use raqote::DrawTarget;
 use serde::Deserialize;
 use std::cell::RefCell;
@@ -26,6 +27,27 @@ pub mod dcs {
         pub z: Vec3,
         /// Position in world
         pub p: Vec3,
+    }
+
+    impl Position {
+        #[rustfmt::skip]
+        pub fn rotation(&self) -> Rotation3<f32> {
+            Rotation3::<f32>::from_matrix_unchecked(Matrix3::new(
+                self.x.x, self.z.x, self.y.x,
+                self.x.z, self.z.z, self.y.z,
+                self.x.y, self.z.y, self.y.y,
+            ))
+        }
+
+        pub fn get_relative_vector(&self, other: &Rotation3<f32>) -> Vec3 {
+            let self_rotation = self.rotation();
+            let difference = self_rotation.matrix() - other.matrix();
+            Vec3 {
+                x: difference.m11,
+                y: difference.m21,
+                z: difference.m31,
+            }
+        }
     }
 
     #[serde(default)]
@@ -84,6 +106,14 @@ pub struct CockpitParams {
 }
 
 impl FlightData {
+    pub fn camera_relative_vector(&self) -> dcs::Vec3 {
+        self.cam.get_relative_vector(&Rotation3::from_euler_angles(
+            -self.bank,
+            -self.pitch,
+            self.yaw,
+        ))
+    }
+
     pub fn parse_cockpit_params(&self) -> Option<CockpitParams> {
         self.cp_params.as_ref().map(|params_raw| {
             let mut params = CockpitParams::default();
