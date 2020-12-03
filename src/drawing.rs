@@ -33,15 +33,15 @@ pub fn draw<'a>(
     draw_target.clear(background());
 
     let cp = data.parse_cockpit_params().unwrap_or_default();
-    let cv = data.camera_relative_vector();
+    let (pitch, yaw, _) = data.camera_angles();
 
-    let occluded = 
+    let occluded =
         // HUD area
-        (cv.y.abs() < 0.2 && cv.z < 0.0 && cv.x > 0.0) ||
+        (pitch < f32::to_radians(5.0) && yaw.abs() < f32::to_radians(10.0)) ||
         // Front dash
-        (cv.y.abs() < 0.4 && cv.z < -0.2 && cv.x > 0.0) ||
+        (pitch < f32::to_radians(-25.0) && yaw.abs() < f32::to_radians(50.0)) ||
         // Side consoles
-        (cv.z < -0.7);
+        (pitch < f32::to_radians(-45.0));
 
     // Format text information
     let text = if cp.ejected {
@@ -50,14 +50,13 @@ pub fn draw<'a>(
         String::from("*")
     } else {
         format!(
-            "{}\n{}\n{}\n\n\n\n\n\n\n\n\n\n\n{}\n{}\n{}",
+            "{}\n{}\n\n\n\n\n\n\n\n\n\n\n\n{}\n{}\n{}",
             format!("                   {:0>3.0}", data.yaw.to_degrees()),
             format!(
                 "[{:>3.0}]                              [{:>5.0}]",
                 data.ias * 1.943844, // m/s -> kn
                 data.alt * 3.28084   // m -> ft
             ),
-            format!("{:#?}", data.camera_relative_vector()),
             // 3rd line from bottom
             {
                 let mach_str = format!("M {:.2}", data.mach);

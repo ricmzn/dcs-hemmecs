@@ -1,5 +1,4 @@
 use font_kit::font::Font;
-use nalgebra::{Matrix3, Rotation3};
 use raqote::DrawTarget;
 use serde::Deserialize;
 use std::cell::RefCell;
@@ -11,9 +10,28 @@ pub mod dcs {
     #[serde(default)]
     #[derive(Debug, Clone, Default, Deserialize)]
     pub struct Vec3 {
+        /// x coordinate or pitch
         pub x: f32,
+        /// Y coordinate or yaw
         pub y: f32,
+        /// Z coordinate or roll
         pub z: f32,
+    }
+
+    impl Vec3 {
+        pub fn as_glm_vec3(&self) -> glm::Vec3 {
+            glm::Vec3::new(self.x, self.y, self.z)
+        }
+    }
+
+    impl From<glm::Vec3> for Vec3 {
+        fn from(vec: glm::Vec3) -> Self {
+            Vec3 {
+                x: vec.x,
+                y: vec.y,
+                z: vec.z,
+            }
+        }
     }
 
     #[serde(default)]
@@ -30,22 +48,16 @@ pub mod dcs {
     }
 
     impl Position {
-        #[rustfmt::skip]
-        pub fn rotation(&self) -> Rotation3<f32> {
-            Rotation3::<f32>::from_matrix_unchecked(Matrix3::new(
-                self.x.x, self.z.x, self.y.x,
-                self.x.z, self.z.z, self.y.z,
-                self.x.y, self.z.y, self.y.y,
-            ))
-        }
-
-        pub fn get_relative_vector(&self, other: &Rotation3<f32>) -> Vec3 {
-            let self_rotation = self.rotation();
-            let difference = self_rotation.matrix() - other.matrix();
-            Vec3 {
-                x: difference.m11,
-                y: difference.m21,
-                z: difference.m31,
+        /// Rotates all three orientation vectors around a given axis
+        pub fn rotate(&self, angle: f32, axis: &glm::Vec3) -> Self {
+            let x = glm::rotate_vec3(&self.x.as_glm_vec3(), angle, &axis);
+            let y = glm::rotate_vec3(&self.y.as_glm_vec3(), angle, &axis);
+            let z = glm::rotate_vec3(&self.z.as_glm_vec3(), angle, &axis);
+            Position {
+                x: x.into(),
+                y: y.into(),
+                z: z.into(),
+                p: self.p.clone(),
             }
         }
     }
@@ -106,12 +118,23 @@ pub struct CockpitParams {
 }
 
 impl FlightData {
-    pub fn camera_relative_vector(&self) -> dcs::Vec3 {
-        self.cam.get_relative_vector(&Rotation3::from_euler_angles(
-            -self.bank,
-            -self.pitch,
-            self.yaw,
-        ))
+    /// Returns the direction where the camera is pointed relative to the plane
+    /// in the format (pitch, yaw, roll)
+    ///
+    /// Todo: implement roll calculation from orientation vector
+    pub fn camera_angles(&self) -> (f32, f32, f32) {
+        let x_yaw = glm::rotate_vec3(&glm::Vec3::x_axis(), -self.yaw, &glm::Vec3::y_axis());
+        let z_yaw = glm::rotate_vec3(&glm::Vec3::z_axis(), -self.yaw, &glm::Vec3::y_axis());
+        let x_yaw_pitch = glm::rotate_vec3(&x_yaw, self.pitch, &z_yaw);
+
+        // Rotate the camera in all axes
+        let cam = &self.cam;
+        let cam = cam.rotate(-self.bank, &x_yaw_pitch);
+        let cam = cam.rotate(-self.pitch, &z_yaw);
+        let cam = cam.rotate(self.yaw, &glm::Vec3::y_axis());
+
+        // X vector is forward, Y is up, and Z is right
+        (cam.x.y.asin(), cam.x.z.atan2(cam.x.x), -cam.z.y.asin())
     }
 
     pub fn parse_cockpit_params(&self) -> Option<CockpitParams> {
