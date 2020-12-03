@@ -120,8 +120,6 @@ pub struct CockpitParams {
 impl FlightData {
     /// Returns the direction where the camera is pointed relative to the plane
     /// in the format (pitch, yaw, roll)
-    ///
-    /// Todo: implement roll calculation from orientation vector
     pub fn camera_angles(&self) -> (f32, f32, f32) {
         let x_yaw = glm::rotate_vec3(&glm::Vec3::x_axis(), -self.yaw, &glm::Vec3::y_axis());
         let z_yaw = glm::rotate_vec3(&glm::Vec3::z_axis(), -self.yaw, &glm::Vec3::y_axis());
