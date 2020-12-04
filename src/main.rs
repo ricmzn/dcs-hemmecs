@@ -28,24 +28,25 @@ fn main() {
     // Use an atomic boolean to syncronize the quit flag across threads
     let quit_signal = AtomicBool::new(false);
 
-    // Get the application configuration
-    let (config, config_notifier) = match load_or_create_config() {
-        Ok((config, rx, false)) => (config, Some(rx)),
-        Ok((config, rx, true)) => {
+    // Get the application configuration and its watcher + notifier combo
+    // Note: we have to keep the watcher around even if we don't use it, or else it will be dropped and stop working
+    let (config, _config_watcher, config_notifier) = match load_or_create_config() {
+        Ok((config, watcher, notifier, false)) => (config, Some(watcher), Some(notifier)),
+        Ok((config, watcher, notifier, true)) => {
             show_message_box(MessageBoxType::Info(FIRST_TIME_MESSAGE.into()));
-            (config, Some(rx))
+            (config, Some(watcher), Some(notifier))
         }
         Err(err) if err.downcast_ref::<toml::de::Error>().is_some() => {
             show_message_box(MessageBoxType::Error(format!(
                 "Error while loading config file:\n\n{}",
                 err
             )));
-            (Config::default(), None)
+            (Config::default(), None, None)
         }
         Err(err) => {
             eprintln!("Internal error while loading/saving config file: {:?}", err);
             show_message_box(MessageBoxType::Error(COULD_NOT_CREATE_CONFIG.into()));
-            (Config::default(), None)
+            (Config::default(), None, None)
         }
     };
 

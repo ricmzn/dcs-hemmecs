@@ -42,8 +42,29 @@ impl Default for Config {
     }
 }
 
+fn watch(path: &str) -> Result<(impl notify::Watcher, Receiver<notify::DebouncedEvent>)> {
+    let (sender, receiver) = channel();
+    let mut watcher = notify::watcher(sender, Duration::from_millis(100))?;
+    watcher.watch(path, notify::RecursiveMode::NonRecursive)?;
+    Ok((watcher, receiver))
+}
+
+/// Reads config file if it exists, or returns an error if it cannot be opened
+pub fn read_existing_config() -> Result<Config> {
+    let mut file = File::open(CONFIG_FILE).context("failed to open config file")?;
+    let mut buf = Vec::new();
+    file.read_to_end(&mut buf)
+        .context("failed to read from config file")?;
+    Ok(toml::from_slice(&buf)?)
+}
+
 /// If successful, returns the application config, a modification notification channel, and a boolean indicating if the config was newly created on this call
-pub fn load_or_create_config() -> Result<(Config, Receiver<notify::DebouncedEvent>, bool)> {
+pub fn load_or_create_config() -> Result<(
+    Config,
+    impl notify::Watcher,
+    Receiver<notify::DebouncedEvent>,
+    bool,
+)> {
     // Try to open an existing config
     match File::open(CONFIG_FILE) {
         Ok(mut file) => {
@@ -66,11 +87,8 @@ pub fn load_or_create_config() -> Result<(Config, Receiver<notify::DebouncedEven
             rename(&tmp_filename, CONFIG_FILE)
                 .context("failed to overwrite config file with new values")?;
 
-            let (tx, rx) = channel();
-            notify::watcher(tx, Duration::from_millis(500))?
-                .watch(CONFIG_FILE, notify::RecursiveMode::NonRecursive)?;
-
-            Ok((config, rx, false))
+            let (watcher, notifier) = watch(CONFIG_FILE)?;
+            Ok((config, watcher, notifier, false))
         }
         Err(error) => {
             if error.kind() == ErrorKind::NotFound {
@@ -85,11 +103,8 @@ pub fn load_or_create_config() -> Result<(Config, Receiver<notify::DebouncedEven
                         .as_bytes(),
                 )?;
 
-                let (tx, rx) = channel();
-                notify::watcher(tx, Duration::from_millis(500))?
-                    .watch(CONFIG_FILE, notify::RecursiveMode::NonRecursive)?;
-
-                Ok((default_config, rx, true))
+                let (watcher, notifier) = watch(CONFIG_FILE)?;
+                Ok((default_config, watcher, notifier, true))
             } else {
                 Err(error).context("failed to open config file")?
             }
