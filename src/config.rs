@@ -6,22 +6,35 @@ use std::io::{ErrorKind, Read, Write};
 use crate::consts::CONFIG_FILE;
 
 #[derive(Serialize, Deserialize)]
-pub struct HudConfig {
-    pub enable_occlusion: bool,
+#[serde(default)]
+pub struct OcclusionConfig {
+    pub enable: bool,
+    pub allow_hud_overlap: bool,
+    pub hud_overlap_horizontal_angle: f32,
+    pub hud_overlap_vertical_angle: f32,
+}
+
+impl Default for OcclusionConfig {
+    fn default() -> Self {
+        OcclusionConfig {
+            enable: true,
+            allow_hud_overlap: false,
+            hud_overlap_horizontal_angle: 10.0,
+            hud_overlap_vertical_angle: 5.0,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
-    pub hud: HudConfig,
+    pub occlusion: OcclusionConfig,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Config {
-            hud: HudConfig {
-                enable_occlusion: true,
-            },
+            occlusion: OcclusionConfig::default(),
         }
     }
 }

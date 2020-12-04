@@ -148,14 +148,21 @@ impl FlightData {
         (cam.x.y.asin(), cam.x.z.atan2(cam.x.x), -cam.z.y.asin())
     }
 
-    pub fn is_occluded(camera_angles: (f32, f32, f32)) -> bool {
-        let (pitch, yaw, _roll) = camera_angles.to_degrees();
-        // HUD area
-        (pitch < 5.0 && yaw.abs() < 10.0) ||
-        // Front dash
-        (yaw.abs() / 1.5 + pitch < -10.0) ||
-        // Side consoles
-        (pitch < -45.0)
+    pub fn is_occluded(camera_angles: (f32, f32, f32), config: &Config) -> bool {
+        if config.occlusion.enable {
+            let (pitch, yaw, _roll) = camera_angles.to_degrees();
+            let hud_occlusion = !config.occlusion.allow_hud_overlap;
+            let hud_max_pitch = config.occlusion.hud_overlap_vertical_angle;
+            let hud_max_yaw = config.occlusion.hud_overlap_horizontal_angle;
+            // HUD area
+            (hud_occlusion && pitch < hud_max_pitch && yaw.abs() < hud_max_yaw) ||
+            // Front dash
+            (pitch < -20.0 && yaw.abs() / 1.5 + pitch < -10.0) ||
+            // Side consoles
+            (pitch < -45.0)
+        } else {
+            false
+        }
     }
 
     pub fn parse_cockpit_params(&self) -> Option<CockpitParams> {
