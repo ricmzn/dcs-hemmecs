@@ -13,4 +13,6 @@ raqote = { git = "https://github.com/ricmzn/raqote.git", branch = "0.8" }
 glm = { package = "nalgebra-glm", version = "0.3" }
 crossbeam = "0.8"
 font-kit = "0.7"
+anyhow = "1.0"
 regex = "1.4"
+toml = "0.5"

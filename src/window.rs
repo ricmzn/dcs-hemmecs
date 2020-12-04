@@ -51,8 +51,8 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
                 let hdc = BeginPaint(hwnd, &mut ps as *mut PAINTSTRUCT);
 
                 // Unpack the data fields
-                let fd = { data.flight_data.lock().unwrap().clone() };
-                let mut dt = data.draw_target.borrow_mut();
+                let flight_data = { data.flight_data.lock().unwrap().clone() };
+                let mut draw_target = data.draw_target.borrow_mut();
                 let font = data.font.borrow();
 
                 // Copy image data to window
@@ -66,7 +66,8 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
                     0,
                     WIDTH,
                     HEIGHT,
-                    draw(hwnd, &fd, &mut dt, &font) as *const [u32] as *mut _,
+                    draw(hwnd, &data.config, &flight_data, &mut draw_target, &font)
+                        as *const [u32] as *mut _,
                     &BMP_INFO as *const BITMAPINFO,
                     DIB_RGB_COLORS,
                     SRCCOPY,
@@ -153,5 +154,28 @@ pub fn run_window_loop(hwnd: HWND, quit_signal: &AtomicBool) {
                 break;
             }
         }
+    }
+}
+
+pub enum MessageBoxType {
+    Error(String),
+    Info(String),
+}
+
+pub fn show_message_box(msg_type: MessageBoxType) -> bool {
+    unsafe {
+        let (title, message, flags) = match msg_type {
+            MessageBoxType::Error(msg) => (
+                b"Error\0" as *const u8 as *const i8,
+                CString::new(msg).unwrap(),
+                MB_ICONERROR,
+            ),
+            MessageBoxType::Info(msg) => (
+                b"Information\0" as *const u8 as *const i8,
+                CString::new(msg).unwrap(),
+                MB_ICONINFORMATION,
+            ),
+        };
+        MessageBoxA(NULL(), message.as_ptr(), title, flags) == IDOK
     }
 }

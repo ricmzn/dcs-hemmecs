@@ -4,6 +4,8 @@ use serde::Deserialize;
 use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
 
+use crate::config::Config;
+
 pub mod dcs {
     use super::*;
 
@@ -132,6 +134,16 @@ impl FlightData {
         (cam.x.y.asin(), cam.x.z.atan2(cam.x.x), -cam.z.y.asin())
     }
 
+    pub fn is_occluded(camera_angles: (f32, f32, f32)) -> bool {
+        let (pitch, yaw, _roll) = camera_angles;
+        // HUD area
+        (pitch < f32::to_radians(5.0) && yaw.abs() < f32::to_radians(10.0)) ||
+        // Front dash
+        (pitch < f32::to_radians(-25.0) && yaw.abs() < f32::to_radians(50.0)) ||
+        // Side consoles
+        (pitch < f32::to_radians(-45.0))
+    }
+
     pub fn parse_cockpit_params(&self) -> Option<CockpitParams> {
         self.cp_params.as_ref().map(|params_raw| {
             let mut params = CockpitParams::default();
@@ -164,4 +176,5 @@ pub struct WindowData {
     pub flight_data: Arc<Mutex<FlightData>>,
     pub draw_target: RefCell<DrawTarget>,
     pub font: RefCell<Font>,
+    pub config: Config,
 }

@@ -7,6 +7,7 @@ use winapi::shared::windef::HWND;
 use winapi::um::winuser::GetFocus;
 
 use crate::{
+    config::Config,
     consts::{
         background, green, red, DRAW_OPTIONS, FONT_SIZE, HEIGHT, TEXT_COLUMNS, TEXT_OFFSET_Y, WIDTH,
     },
@@ -26,27 +27,20 @@ fn two_columns(left: &str, right: &str) -> String {
 
 pub fn draw<'a>(
     hwnd: HWND,
+    config: &Config,
     data: &FlightData,
     draw_target: &'a mut DrawTarget,
     default_font: &Font,
 ) -> &'a [u32] {
     draw_target.clear(background());
 
-    let cp = data.parse_cockpit_params().unwrap_or_default();
-    let (pitch, yaw, _) = data.camera_angles();
-
-    let occluded =
-        // HUD area
-        (pitch < f32::to_radians(5.0) && yaw.abs() < f32::to_radians(10.0)) ||
-        // Front dash
-        (pitch < f32::to_radians(-25.0) && yaw.abs() < f32::to_radians(50.0)) ||
-        // Side consoles
-        (pitch < f32::to_radians(-45.0));
+    let cockpit_params = data.parse_cockpit_params().unwrap_or_default();
+    let camera_angles = data.camera_angles();
 
     // Format text information
-    let text = if cp.ejected {
-        String::from("EJECTED")
-    } else if occluded {
+    let text = if cockpit_params.ejected {
+        String::from("YEET")
+    } else if config.enable_hud_occlusion && FlightData::is_occluded(camera_angles) {
         String::from("*")
     } else {
         format!(
