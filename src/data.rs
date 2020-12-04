@@ -2,7 +2,7 @@ use font_kit::font::Font;
 use raqote::DrawTarget;
 use serde::Deserialize;
 use std::cell::RefCell;
-use std::sync::{Arc, Mutex};
+use std::sync::RwLock;
 
 use crate::config::Config;
 
@@ -193,9 +193,9 @@ impl FlightData {
     }
 }
 
-pub struct WindowData {
-    pub flight_data: Arc<Mutex<FlightData>>,
+pub struct ApplicationState {
+    pub flight_data: RwLock<Option<FlightData>>,
     pub draw_target: RefCell<DrawTarget>,
     pub font: RefCell<Font>,
-    pub config: Config,
+    pub config: RwLock<Config>,
 }

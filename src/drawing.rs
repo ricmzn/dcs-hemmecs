@@ -25,86 +25,14 @@ fn two_columns(left: &str, right: &str) -> String {
     )
 }
 
-pub fn draw<'a>(
-    hwnd: HWND,
-    config: &Config,
-    data: &FlightData,
-    draw_target: &'a mut DrawTarget,
-    default_font: &Font,
-) -> &'a [u32] {
-    draw_target.clear(background());
-
-    let cockpit_params = data.parse_cockpit_params().unwrap_or_default();
-    let camera_angles = data.camera_angles();
-
-    // Format text information
-    let text = if cockpit_params.ejected {
-        String::from("YEET")
-    } else if FlightData::is_occluded(camera_angles, &config) {
-        String::from("*")
-    } else {
-        format!(
-            "{}\n{}\n\n\n\n\n\n\n\n\n\n\n\n{}\n{}\n{}",
-            format!("                   {:0>3.0}", data.yaw.to_degrees()),
-            format!(
-                "[{:>3.0}]                              [{:>5.0}]",
-                data.ias * 1.943844, // m/s -> kn
-                data.alt * 3.28084   // m -> ft
-            ),
-            // 3rd line from bottom
-            {
-                let mach_str = format!("M {:.2}", data.mach);
-                if let Some(weapon) = &data.weapons {
-                    let weapon_str = if let Some(current) = &weapon.current {
-                        // Remove the prefix and suffix for brevity
-                        let short_name = WEAPON_CODE
-                            .captures(&current.name)
-                            .and_then(|captures| captures.get(1))
-                            .map(|m| m.as_str())
-                            .unwrap_or(&current.name);
-
-                        format!("{} {}", short_name, current.count)
-                    } else {
-                        String::new()
-                    };
-                    two_columns(&mach_str, &weapon_str)
-                } else {
-                    mach_str
-                }
-            },
-            // 2nd line from bottom
-            {
-                let g_str = format!("G {:.1}", data.g.y);
-                if let Some(weapon) = &data.weapons {
-                    let shells_str = format!("GUN {}", weapon.shells);
-                    two_columns(&g_str, &shells_str)
-                } else {
-                    g_str
-                }
-            },
-            // last line
-            {
-                let aoa_str = format!("a {:.1}", data.aoa);
-                if let Some(engine_data) = &data.engine_data {
-                    let fuel_str = format!(
-                        "{:.0} lbs",
-                        (engine_data.fuel_internal + engine_data.fuel_external) * 2.204622622 // kg -> lb
-                    );
-                    two_columns(&aoa_str, &fuel_str)
-                } else {
-                    aoa_str
-                }
-            }
-        )
-    };
-
-    // Draw text on the canvas
+/// Draws text on the canvas with the configured font size
+fn draw_text(draw_target: &mut DrawTarget, font: &Font, text: &str) {
     draw_target.draw_glyphs(
-        &default_font,
+        &font,
         FONT_SIZE,
         &text
             .chars()
-            .map(|c| default_font.glyph_for_char(c).unwrap_or_default())
+            .map(|c| font.glyph_for_char(c).unwrap_or_default())
             .collect::<Vec<_>>(),
         &text
             .chars()
@@ -126,6 +54,85 @@ pub fn draw<'a>(
         &green(),
         &DRAW_OPTIONS,
     );
+}
+
+pub fn draw<'a>(
+    hwnd: HWND,
+    config: &Config,
+    data: &Option<FlightData>,
+    draw_target: &'a mut DrawTarget,
+    default_font: &Font,
+) -> &'a [u32] {
+    draw_target.clear(background());
+
+    if let Some(data) = data {
+        let cockpit_params = data.parse_cockpit_params().unwrap_or_default();
+        let camera_angles = data.camera_angles();
+
+        // Format text information
+        let text = if cockpit_params.ejected {
+            String::from("YEET")
+        } else if FlightData::is_occluded(camera_angles, &config) {
+            String::from("*")
+        } else {
+            format!(
+                "{}\n{}\n\n\n\n\n\n\n\n\n\n\n\n{}\n{}\n{}",
+                format!("                   {:0>3.0}", data.yaw.to_degrees()),
+                format!(
+                    "[{:>3.0}]                              [{:>5.0}]",
+                    data.ias * 1.943844, // m/s -> kn
+                    data.alt * 3.28084   // m -> ft
+                ),
+                // 3rd line from bottom
+                {
+                    let mach_str = format!("M {:.2}", data.mach);
+                    if let Some(weapon) = &data.weapons {
+                        let weapon_str = if let Some(current) = &weapon.current {
+                            // Remove the prefix and suffix for brevity
+                            let short_name = WEAPON_CODE
+                                .captures(&current.name)
+                                .and_then(|captures| captures.get(1))
+                                .map(|m| m.as_str())
+                                .unwrap_or(&current.name);
+
+                            format!("{} {}", short_name, current.count)
+                        } else {
+                            String::new()
+                        };
+                        two_columns(&mach_str, &weapon_str)
+                    } else {
+                        mach_str
+                    }
+                },
+                // 2nd line from bottom
+                {
+                    let g_str = format!("G {:.1}", data.g.y);
+                    if let Some(weapon) = &data.weapons {
+                        let shells_str = format!("GUN {}", weapon.shells);
+                        two_columns(&g_str, &shells_str)
+                    } else {
+                        g_str
+                    }
+                },
+                // last line
+                {
+                    let aoa_str = format!("a {:.1}", data.aoa);
+                    if let Some(engine_data) = &data.engine_data {
+                        let fuel_str = format!(
+                            "{:.0} lbs",
+                            (engine_data.fuel_internal + engine_data.fuel_external) * 2.204622622 // kg -> lb
+                        );
+                        two_columns(&aoa_str, &fuel_str)
+                    } else {
+                        aoa_str
+                    }
+                }
+            )
+        };
+        draw_text(draw_target, &default_font, &text);
+    } else {
+        draw_text(draw_target, &default_font, "Not Connected");
+    }
 
     // Paint window border in case it's in focus
     if unsafe { GetFocus() } == hwnd {

@@ -1,11 +1,14 @@
 use anyhow::{Context, Result};
+use notify::Watcher;
 use serde::{Deserialize, Serialize};
 use std::fs::{rename, File};
 use std::io::{ErrorKind, Read, Write};
+use std::sync::mpsc::{channel, Receiver};
+use std::time::Duration;
 
 use crate::consts::CONFIG_FILE;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct OcclusionConfig {
     pub enable: bool,
@@ -25,7 +28,7 @@ impl Default for OcclusionConfig {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
     pub occlusion: OcclusionConfig,
@@ -39,8 +42,8 @@ impl Default for Config {
     }
 }
 
-/// If successful, returns the application config and a boolean indicating if the config was newly created on this call
-pub fn load_or_create_config() -> Result<(Config, bool)> {
+/// If successful, returns the application config, a modification notification channel, and a boolean indicating if the config was newly created on this call
+pub fn load_or_create_config() -> Result<(Config, Receiver<notify::DebouncedEvent>, bool)> {
     // Try to open an existing config
     match File::open(CONFIG_FILE) {
         Ok(mut file) => {
@@ -63,7 +66,11 @@ pub fn load_or_create_config() -> Result<(Config, bool)> {
             rename(&tmp_filename, CONFIG_FILE)
                 .context("failed to overwrite config file with new values")?;
 
-            Ok((config, false))
+            let (tx, rx) = channel();
+            notify::watcher(tx, Duration::from_millis(500))?
+                .watch(CONFIG_FILE, notify::RecursiveMode::NonRecursive)?;
+
+            Ok((config, rx, false))
         }
         Err(error) => {
             if error.kind() == ErrorKind::NotFound {
@@ -78,7 +85,11 @@ pub fn load_or_create_config() -> Result<(Config, bool)> {
                         .as_bytes(),
                 )?;
 
-                Ok((default_config, true))
+                let (tx, rx) = channel();
+                notify::watcher(tx, Duration::from_millis(500))?
+                    .watch(CONFIG_FILE, notify::RecursiveMode::NonRecursive)?;
+
+                Ok((default_config, rx, true))
             } else {
                 Err(error).context("failed to open config file")?
             }

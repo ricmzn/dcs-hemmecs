@@ -1,7 +1,7 @@
 use std::ffi::CString;
 use std::pin::Pin;
 use std::ptr::null_mut as NULL;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
 use winapi::shared::windef::*;
 use winapi::um::errhandlingapi::*;
 use winapi::um::libloaderapi::*;
@@ -10,7 +10,7 @@ use winapi::um::winuser::*;
 
 use crate::consts::{HEIGHT, WIDTH};
 use crate::drawing::draw;
-use crate::WindowData;
+use crate::ApplicationState;
 
 const COLORS: RGBQUAD = RGBQUAD {
     rgbRed: 0xff,
@@ -37,7 +37,7 @@ const BMP_INFO: BITMAPINFO = BITMAPINFO {
 };
 
 unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lparam: isize) -> isize {
-    let data = GetWindowLongPtrA(hwnd, GWL_USERDATA) as *const Pin<Box<WindowData>>;
+    let data = GetWindowLongPtrA(hwnd, GWL_USERDATA) as *const Pin<Box<ApplicationState>>;
     match msg {
         WM_NCCREATE => {
             // Save the passed Mutex<WindowData> pointer into the user data field of the window
@@ -51,7 +51,8 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
                 let hdc = BeginPaint(hwnd, &mut ps as *mut PAINTSTRUCT);
 
                 // Unpack the data fields
-                let flight_data = { data.flight_data.lock().unwrap().clone() };
+                let flight_data = { data.flight_data.read().unwrap().clone() };
+                let config = { data.config.read().unwrap().clone() };
                 let mut draw_target = data.draw_target.borrow_mut();
                 let font = data.font.borrow();
 
@@ -66,8 +67,8 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
                     0,
                     WIDTH,
                     HEIGHT,
-                    draw(hwnd, &data.config, &flight_data, &mut draw_target, &font)
-                        as *const [u32] as *mut _,
+                    draw(hwnd, &config, &flight_data, &mut draw_target, &font) as *const [u32]
+                        as *mut _,
                     &BMP_INFO as *const BITMAPINFO,
                     DIB_RGB_COLORS,
                     SRCCOPY,
@@ -88,7 +89,7 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
     }
 }
 
-pub fn create_window(window_data: &Pin<Box<WindowData>>) -> HWND {
+pub fn create_window(window_data: &Pin<Box<ApplicationState>>) -> HWND {
     let instance = unsafe { GetModuleHandleA(NULL()) };
     let class_name = CString::new("HMDWindow").unwrap();
     let title = CString::new("HMD").unwrap();
@@ -141,7 +142,7 @@ pub fn create_window(window_data: &Pin<Box<WindowData>>) -> HWND {
 /// `hwnd` must be a valid window handle, otherwise this results in undefined behavior
 pub fn run_window_loop(hwnd: HWND, quit_signal: &AtomicBool) {
     // Run look while other threads are running
-    while quit_signal.load(Ordering::Relaxed) == false {
+    while quit_signal.load(Relaxed) == false {
         unsafe {
             let mut msg: MSG = std::mem::zeroed();
             // Process Windows event messages
@@ -150,7 +151,7 @@ pub fn run_window_loop(hwnd: HWND, quit_signal: &AtomicBool) {
                 DispatchMessageA(&msg as *const _);
             } else {
                 // Notify other threads that the window has been closed
-                quit_signal.store(true, Ordering::Relaxed);
+                quit_signal.store(true, Relaxed);
                 break;
             }
         }
