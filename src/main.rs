@@ -38,13 +38,13 @@ fn main() {
         }
         Err(err) if err.downcast_ref::<toml::de::Error>().is_some() => {
             show_message_box(MessageBoxType::Error(format!(
-                "Found an error while loading config file:\n\n{}",
+                "Error while loading config file:\n\n{}",
                 err
             )));
             Config::default()
         }
         Err(err) => {
-            eprintln!("Error details: {}", err);
+            eprintln!("Internal error while loading/saving config file: {:?}", err);
             show_message_box(MessageBoxType::Error(COULD_NOT_CREATE_CONFIG.into()));
             Config::default()
         }

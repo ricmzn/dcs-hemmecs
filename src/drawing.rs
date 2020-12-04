@@ -40,7 +40,7 @@ pub fn draw<'a>(
     // Format text information
     let text = if cockpit_params.ejected {
         String::from("YEET")
-    } else if config.enable_hud_occlusion && FlightData::is_occluded(camera_angles) {
+    } else if config.hud.enable_occlusion && FlightData::is_occluded(camera_angles) {
         String::from("*")
     } else {
         format!(
