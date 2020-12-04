@@ -30,16 +30,25 @@ impl Default for OcclusionConfig {
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default)]
-pub struct Config {
-    pub occlusion: OcclusionConfig,
+pub struct MiscConfig {
+    pub color: (u8, u8, u8),
+    pub brightness: u8,
 }
 
-impl Default for Config {
+impl Default for MiscConfig {
     fn default() -> Self {
-        Config {
-            occlusion: OcclusionConfig::default(),
+        MiscConfig {
+            color: (0, 255, 0),
+            brightness: 128,
         }
     }
+}
+
+#[derive(Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Config {
+    pub occlusion: OcclusionConfig,
+    pub misc: MiscConfig,
 }
 
 fn watch(path: &str) -> Result<(impl notify::Watcher, Receiver<notify::DebouncedEvent>)> {

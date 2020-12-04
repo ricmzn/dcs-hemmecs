@@ -51,9 +51,9 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
                 let hdc = BeginPaint(hwnd, &mut ps as *mut PAINTSTRUCT);
 
                 // Unpack the data fields
+                let mut draw_target = data.draw_target.borrow_mut();
                 let flight_data = { data.flight_data.read().unwrap().clone() };
                 let config = { data.config.read().unwrap().clone() };
-                let mut draw_target = data.draw_target.borrow_mut();
                 let font = data.font.borrow();
 
                 // Copy image data to window
@@ -74,6 +74,12 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
                     SRCCOPY,
                 );
 
+                SetLayeredWindowAttributes(
+                    hwnd,
+                    0,
+                    config.misc.brightness,
+                    LWA_ALPHA | LWA_COLORKEY,
+                );
                 EndPaint(hwnd, &mut ps as *mut PAINTSTRUCT);
             }
 
@@ -132,7 +138,7 @@ pub fn create_window(window_data: &Pin<Box<ApplicationState>>) -> HWND {
             let err = GetLastError();
             panic!("Could not create window - Error code: 0x{:08x}", err);
         }
-        SetLayeredWindowAttributes(hwnd, 0, 128, LWA_ALPHA | LWA_COLORKEY);
+        SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA | LWA_COLORKEY);
         hwnd
     }
 }

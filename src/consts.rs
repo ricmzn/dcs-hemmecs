@@ -21,8 +21,8 @@ pub fn red() -> Source<'static> {
     Color::new(255, 255, 0, 0).into()
 }
 
-pub fn green() -> Source<'static> {
-    Color::new(255, 0, 255, 0).into()
+pub fn rgb(rgb: (u8, u8, u8)) -> Source<'static> {
+    Color::new(255, rgb.0, rgb.1, rgb.2).into()
 }
 
 pub const CONFIG_FILE: &str = "dcs-hemmecs.toml";

@@ -1,6 +1,6 @@
 use font_kit::font::Font;
 use once_cell::unsync::Lazy;
-use raqote::{DrawTarget, PathBuilder, Point, StrokeStyle};
+use raqote::{DrawTarget, PathBuilder, Point, Source, StrokeStyle};
 use regex::Regex;
 use std::cell::Cell;
 use winapi::shared::windef::HWND;
@@ -9,7 +9,7 @@ use winapi::um::winuser::GetFocus;
 use crate::{
     config::Config,
     consts::{
-        background, green, red, DRAW_OPTIONS, FONT_SIZE, HEIGHT, TEXT_COLUMNS, TEXT_OFFSET_Y, WIDTH,
+        background, red, rgb, DRAW_OPTIONS, FONT_SIZE, HEIGHT, TEXT_COLUMNS, TEXT_OFFSET_Y, WIDTH,
     },
     data::FlightData,
 };
@@ -26,7 +26,7 @@ fn two_columns(left: &str, right: &str) -> String {
 }
 
 /// Draws text on the canvas with the configured font size
-fn draw_text(draw_target: &mut DrawTarget, font: &Font, text: &str) {
+fn draw_text(draw_target: &mut DrawTarget, font: &Font, color: &Source, text: &str) {
     draw_target.draw_glyphs(
         &font,
         FONT_SIZE,
@@ -51,7 +51,7 @@ fn draw_text(draw_target: &mut DrawTarget, font: &Font, text: &str) {
                 }
             })
             .collect::<Vec<_>>(),
-        &green(),
+        color,
         &DRAW_OPTIONS,
     );
 }
@@ -64,6 +64,8 @@ pub fn draw<'a>(
     default_font: &Font,
 ) -> &'a [u32] {
     draw_target.clear(background());
+
+    let color = rgb(config.misc.color);
 
     if let Some(data) = data {
         let cockpit_params = data.parse_cockpit_params().unwrap_or_default();
@@ -129,9 +131,9 @@ pub fn draw<'a>(
                 }
             )
         };
-        draw_text(draw_target, &default_font, &text);
+        draw_text(draw_target, &default_font, &color, &text);
     } else {
-        draw_text(draw_target, &default_font, "Not Connected");
+        draw_text(draw_target, &default_font, &color, "Not Connected");
     }
 
     // Paint window border in case it's in focus
