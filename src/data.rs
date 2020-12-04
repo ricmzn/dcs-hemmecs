@@ -10,11 +10,8 @@ pub mod dcs {
     #[serde(default)]
     #[derive(Debug, Clone, Default, Deserialize)]
     pub struct Vec3 {
-        /// x coordinate or pitch
         pub x: f32,
-        /// Y coordinate or yaw
         pub y: f32,
-        /// Z coordinate or roll
         pub z: f32,
     }
 
