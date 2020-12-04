@@ -6,6 +6,20 @@ use std::sync::{Arc, Mutex};
 
 use crate::config::Config;
 
+trait ToDegrees {
+    fn to_degrees(&self) -> Self;
+}
+
+impl ToDegrees for (f32, f32, f32) {
+    fn to_degrees(&self) -> Self {
+        (
+            self.0.to_degrees(),
+            self.1.to_degrees(),
+            self.2.to_degrees(),
+        )
+    }
+}
+
 pub mod dcs {
     use super::*;
 
@@ -135,13 +149,13 @@ impl FlightData {
     }
 
     pub fn is_occluded(camera_angles: (f32, f32, f32)) -> bool {
-        let (pitch, yaw, _roll) = camera_angles;
+        let (pitch, yaw, _roll) = camera_angles.to_degrees();
         // HUD area
-        (pitch < f32::to_radians(5.0) && yaw.abs() < f32::to_radians(10.0)) ||
+        (pitch < 5.0 && yaw.abs() < 10.0) ||
         // Front dash
-        (pitch < f32::to_radians(-25.0) && yaw.abs() < f32::to_radians(50.0)) ||
+        (yaw.abs() / 1.5 + pitch < -10.0) ||
         // Side consoles
-        (pitch < f32::to_radians(-45.0))
+        (pitch < -45.0)
     }
 
     pub fn parse_cockpit_params(&self) -> Option<CockpitParams> {
