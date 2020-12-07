@@ -26,6 +26,7 @@ function exportData()
     local pitch, bank, yaw = LoGetADIPitchBankYaw()
     local weapons = nil
     local payload = LoGetPayloadInfo()
+    local player = LoGetSelfData()
     if payload ~= nil then
         local selected = payload.Stations[payload.CurrentStation]
         if selected ~= nil then
@@ -63,6 +64,7 @@ function exportData()
         g = LoGetAccelerationUnits(),
         cam = LoGetCameraPosition(),
         engine_data = LoGetEngineInfo(),
+        unit = player.Name,
         weapons = weapons
     })
     return client:send(data.."\n")

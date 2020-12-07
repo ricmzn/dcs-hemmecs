@@ -11,7 +11,7 @@ use crate::{
     consts::{
         background, red, rgb, DRAW_OPTIONS, FONT_SIZE, HEIGHT, TEXT_COLUMNS, TEXT_OFFSET_Y, WIDTH,
     },
-    data::FlightData,
+    data::{FlightData, UnitSystem},
 };
 
 const WEAPON_CODE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?:\w+[-.])?(\w+)(?:\s.+)?").unwrap());
@@ -71,19 +71,26 @@ pub fn draw<'a>(
         let cockpit_params = data.parse_cockpit_params().unwrap_or_default();
         let camera_angles = data.camera_angles();
 
-        // Format text information
         let text = if cockpit_params.ejected {
             String::from("YEET")
         } else if FlightData::is_occluded(camera_angles, &config) {
             String::from("*")
         } else {
+            // Convert units as necessary
+            let unit_system = data.get_unit_system();
+            let (ias, ias_digits, alt, alt_digits) = match unit_system {
+                // m/s -> km/h and m
+                UnitSystem::Metric => (data.ias * 3.6, 4, data.alt, 5),
+                // m/s -> kn and m -> ft
+                UnitSystem::Imperial => (data.ias * 1.943844, 3, data.alt * 3.28084, 5),
+            };
+            // Generate the output text
             format!(
                 "{}\n{}\n\n\n\n\n\n\n\n\n\n\n\n{}\n{}\n{}",
                 format!("                   {:0>3.0}", data.yaw.to_degrees()),
-                format!(
-                    "[{:>3.0}]                              [{:>5.0}]",
-                    data.ias * 1.943844, // m/s -> kn
-                    data.alt * 3.28084   // m -> ft
+                two_columns(
+                    &format!("[{0:>1$.0}]", ias, ias_digits),
+                    &format!("[{0:>1$.0}]", alt, alt_digits)
                 ),
                 // 3rd line from bottom
                 {
@@ -110,9 +117,11 @@ pub fn draw<'a>(
                 {
                     let g_str = format!("G {:.1}", data.g.y);
                     if let Some(weapon) = &data.weapons {
+                        // G-force and cannon ammo
                         let shells_str = format!("GUN {}", weapon.shells);
                         two_columns(&g_str, &shells_str)
                     } else {
+                        // Just g-force
                         g_str
                     }
                 },
@@ -120,12 +129,18 @@ pub fn draw<'a>(
                 {
                     let aoa_str = format!("a {:.1}", data.aoa);
                     if let Some(engine_data) = &data.engine_data {
-                        let fuel_str = format!(
-                            "{:.0} lbs",
-                            (engine_data.fuel_internal + engine_data.fuel_external) * 2.204622622 // kg -> lb
-                        );
+                        // AoA and total fuel (FC3 only)
+                        let fuel_str = match unit_system {
+                            // kg
+                            UnitSystem::Metric => format!("{:.0} kg", engine_data.total_fuel()),
+                            // kg -> lb
+                            UnitSystem::Imperial => {
+                                format!("{:.0} lbs", engine_data.total_fuel() * 2.204622622)
+                            }
+                        };
                         two_columns(&aoa_str, &fuel_str)
                     } else {
+                        // Just AoA
                         aoa_str
                     }
                 }

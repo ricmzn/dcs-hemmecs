@@ -91,6 +91,12 @@ pub mod dcs {
         pub fuel_external: f32,
     }
 
+    impl EngineData {
+        pub fn total_fuel(&self) -> f32 {
+            self.fuel_internal + self.fuel_external
+        }
+    }
+
     #[serde(default)]
     #[derive(Debug, Clone, Default, Deserialize)]
     pub struct WeaponDetails {
@@ -104,6 +110,16 @@ pub mod dcs {
         pub current: Option<WeaponDetails>,
         pub shells: i32,
     }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct CockpitParams {
+    pub ejected: bool,
+}
+
+pub enum UnitSystem {
+    Metric,
+    Imperial,
 }
 
 #[serde(default)]
@@ -123,11 +139,7 @@ pub struct FlightData {
     pub cam: dcs::Position,
     pub engine_data: Option<dcs::EngineData>,
     pub weapons: Option<dcs::WeaponData>,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct CockpitParams {
-    pub ejected: bool,
+    pub unit: String,
 }
 
 impl FlightData {
@@ -190,6 +202,19 @@ impl FlightData {
             }
             params
         })
+    }
+
+    pub fn get_unit_system(&self) -> UnitSystem {
+        // WWII modules are not covered because using this in a WWII scenario would be utterly ridiculous
+        if self.unit.starts_with("MiG-")
+            || self.unit.starts_with("Su-")
+            || self.unit.starts_with("Ka-")
+            || self.unit == "AJS37"
+        {
+            UnitSystem::Metric
+        } else {
+            UnitSystem::Imperial
+        }
     }
 }
 
