@@ -6,22 +6,22 @@ package.cpath = package.cpath..";"..lfs.currentdir().."/LuaSocket/?.dll"
 local socket = require("socket")
 local json = require("json")
 
-function info(str)
+local function log_info(str)
     log.write("HEMMECS.EXPORT", log.INFO, str)
 end
 
-function error(str)
+local function log_error(str)
     log.write("HEMMECS.EXPORT", log.ERROR, str)
 end
 
-function same_weapon(a, b)
+local function same_weapon(a, b)
     return a.level1 == b.level1
         and a.level2 == b.level2
         and a.level3 == b.level3
         and a.level4 == b.level4
 end
 
-function exportData()
+local function exportData()
     local cp_params = list_cockpit_params()
     local pitch, bank, yaw = LoGetADIPitchBankYaw()
     local weapons = nil
@@ -70,59 +70,68 @@ function exportData()
     return client:send(data.."\n")
 end
 
-function disconnect()
+local function disconnect()
     client:shutdown()
     client = nil
-    info("Disconnected")
+    log_info("Disconnected")
 end
 
-local previousLuaExportStart = LuaExportStart
-local previousLuaExportStop = LuaExportStop
-local previousLuaExportAfterNextFrame = LuaExportAfterNextFrame
+local upstreamLuaExportStart = LuaExportStart
+local upstreamLuaExportStop = LuaExportStop
+local upstreamLuaExportAfterNextFrame = LuaExportAfterNextFrame
+
+local function callUpstream(fn, name)
+    if fn ~= nil then
+        successful, err = pcall(fn)
+        if not successful then
+            log_error("Upstream error in "..name..": "..tostring(err))
+        end
+    end
+end
 
 function LuaExportStart()
-    previousLuaExportStart()
-    info("Started")
+    callUpstream(upstreamLuaExportStart, "LuaExportStart")
+    log_info("Started")
     server = socket.tcp()
     server:bind("127.0.0.1", 28561)
     local _, err = server:listen(1)
     if err ~= nil then
-        error("Could not listen for connections: "..err)
+        log_error("Could not listen for connections: "..err)
         return
     end
     server:setoption('keepalive', true)
     server:setoption('tcp-nodelay', true)
     server:settimeout(0)
-    info("Listening for connections")
+    log_info("Listening for connections")
 end
 
 function LuaExportStop()
-    previousLuaExportStop()
+    callUpstream(upstreamLuaExportStop, "LuaExportStop")
     if client ~= nil then
         disconnect()
     end
-    info("Stopped")
+    log_info("Stopped")
 end
 
 function LuaExportAfterNextFrame()
-    previousLuaExportAfterNextFrame()
+    callUpstream(upstreamLuaExportAfterNextFrame, "LuaExportAfterNextFrame")
     if client == nil and server ~= nil then
         local err
         client, err = server:accept()
         if err ~= nil and err ~= "timeout" then
-            error("Failed to accept connection: "..err)
+            log_error("Failed to accept connection: "..err)
         end
         if client ~= nil then
-            info("Connected")
+            log_info("Connected")
         end
     end
     if client ~= nil then
         local _, err = exportData()
         if err ~= nil then
-            error("Error sending message: "..err)
+            log_error("Error sending message: "..err)
             disconnect()
         end
     end
 end
 
-info("Loaded")
+log_info("Loaded")
