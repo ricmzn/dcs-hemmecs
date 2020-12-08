@@ -10,34 +10,35 @@ use crate::consts::CONFIG_FILE;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default)]
-pub struct OcclusionConfig {
-    pub enable: bool,
-    pub allow_hud_overlap: bool,
-    pub hud_overlap_horizontal_angle: f32,
-    pub hud_overlap_vertical_angle: f32,
+#[doc = "docs"]
+pub struct Occlusion {
+    pub hide_on_hud: bool,
+    pub hud_horizontal_angle: f32,
+    pub hud_vertical_angle: f32,
+    pub hide_in_cockpit: bool,
 }
 
-impl Default for OcclusionConfig {
+impl Default for Occlusion {
     fn default() -> Self {
-        OcclusionConfig {
-            enable: true,
-            allow_hud_overlap: false,
-            hud_overlap_horizontal_angle: 10.0,
-            hud_overlap_vertical_angle: 5.0,
+        Occlusion {
+            hide_on_hud: true,
+            hud_horizontal_angle: 10.0,
+            hud_vertical_angle: 5.0,
+            hide_in_cockpit: true,
         }
     }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default)]
-pub struct MiscConfig {
+pub struct Appearance {
     pub color: (u8, u8, u8),
     pub brightness: u8,
 }
 
-impl Default for MiscConfig {
+impl Default for Appearance {
     fn default() -> Self {
-        MiscConfig {
+        Appearance {
             color: (0, 255, 0),
             brightness: 128,
         }
@@ -47,8 +48,8 @@ impl Default for MiscConfig {
 #[derive(Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
-    pub occlusion: OcclusionConfig,
-    pub misc: MiscConfig,
+    pub occlusion: Occlusion,
+    pub appearance: Appearance,
 }
 
 fn watch(path: &str) -> Result<(impl notify::Watcher, Receiver<notify::DebouncedEvent>)> {

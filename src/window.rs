@@ -77,7 +77,7 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
                 SetLayeredWindowAttributes(
                     hwnd,
                     0,
-                    config.misc.brightness,
+                    config.appearance.brightness,
                     LWA_ALPHA | LWA_COLORKEY,
                 );
                 EndPaint(hwnd, &mut ps as *mut PAINTSTRUCT);

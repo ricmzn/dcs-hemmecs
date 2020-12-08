@@ -4,7 +4,7 @@ use serde::Deserialize;
 use std::cell::RefCell;
 use std::sync::RwLock;
 
-use crate::config::Config;
+use crate::config::{Config, Occlusion};
 
 trait ToDegrees {
     fn to_degrees(&self) -> Self;
@@ -161,20 +161,20 @@ impl FlightData {
     }
 
     pub fn is_occluded(camera_angles: (f32, f32, f32), config: &Config) -> bool {
-        if config.occlusion.enable {
-            let (pitch, yaw, _roll) = camera_angles.to_degrees();
-            let hud_occlusion = !config.occlusion.allow_hud_overlap;
-            let hud_max_pitch = config.occlusion.hud_overlap_vertical_angle;
-            let hud_max_yaw = config.occlusion.hud_overlap_horizontal_angle;
-            // HUD area
-            (hud_occlusion && pitch < hud_max_pitch && yaw.abs() < hud_max_yaw) ||
-            // Front dash
-            (pitch < -20.0 && yaw.abs() / 1.5 + pitch < -10.0) ||
-            // Side consoles
-            (pitch < -45.0)
-        } else {
-            false
-        }
+        let (pitch, yaw, _) = camera_angles.to_degrees();
+        let Occlusion {
+            hide_on_hud,
+            hide_in_cockpit,
+            hud_horizontal_angle,
+            hud_vertical_angle,
+        } = config.occlusion;
+
+        // HUD
+        (hide_on_hud && pitch < hud_vertical_angle && yaw.abs() < hud_horizontal_angle) ||
+        // Front dash
+        (hide_in_cockpit && pitch < -20.0 && yaw.abs() / 1.5 + pitch < -10.0) ||
+        // Side consoles
+        (hide_in_cockpit && pitch < -45.0)
     }
 
     pub fn parse_cockpit_params(&self) -> Option<CockpitParams> {

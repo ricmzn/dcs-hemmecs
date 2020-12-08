@@ -65,7 +65,7 @@ pub fn draw<'a>(
 ) -> &'a [u32] {
     draw_target.clear(background());
 
-    let color = rgb(config.misc.color);
+    let color = rgb(config.appearance.color);
 
     if let Some(data) = data {
         let cockpit_params = data.parse_cockpit_params().unwrap_or_default();
