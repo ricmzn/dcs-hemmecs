@@ -209,6 +209,8 @@ impl FlightData {
         if self.unit.starts_with("MiG-")
             || self.unit.starts_with("Su-")
             || self.unit.starts_with("Ka-")
+            || self.unit.starts_with("Mi-")
+            || self.unit == "L-39"
             || self.unit == "AJS37"
         {
             UnitSystem::Metric
