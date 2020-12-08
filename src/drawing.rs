@@ -2,20 +2,21 @@ use font_kit::font::Font;
 use once_cell::unsync::Lazy;
 use raqote::{DrawTarget, PathBuilder, Point, Source, StrokeStyle};
 use regex::Regex;
-use std::cell::Cell;
 use winapi::shared::windef::HWND;
-use winapi::um::winuser::GetFocus;
 
 use crate::{
     config::Config,
     consts::{
-        background, red, rgb, DRAW_OPTIONS, FONT_SIZE, HEIGHT, TEXT_COLUMNS, TEXT_OFFSET_Y, WIDTH,
+        background, red, rgb, DRAW_OPTIONS, FONT_SIZE, HEIGHT, TEXT_COLUMNS, TEXT_OFFSET_X,
+        TEXT_OFFSET_Y, WIDTH,
     },
     data::{FlightData, UnitSystem},
+    window::is_focused,
 };
 
 const WEAPON_CODE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?:\w+[-.])?(\w+)(?:\s.+)?").unwrap());
 
+/// Formats a line as left and right aligned columns of text
 fn two_columns(left: &str, right: &str) -> String {
     format!(
         "{left}{right:>padding$}",
@@ -25,32 +26,38 @@ fn two_columns(left: &str, right: &str) -> String {
     )
 }
 
-/// Draws text on the canvas with the configured font size
+/// Draws text with the default font size
 fn draw_text(draw_target: &mut DrawTarget, font: &Font, color: &Source, text: &str) {
+    let char_ids = text
+        .chars()
+        .filter(|&c| c != '\n')
+        .map(|c| font.glyph_for_char(c).unwrap_or_default())
+        .collect::<Vec<_>>();
+
+    let char_positions = text
+        .chars()
+        .map({
+            // Init
+            let mut x = TEXT_OFFSET_X;
+            let mut y = TEXT_OFFSET_Y;
+            // Loop
+            move |c| {
+                if c == '\n' {
+                    x = FONT_SIZE / 6.0;
+                    y += FONT_SIZE;
+                } else {
+                    x += FONT_SIZE / 2.0;
+                }
+                Point::new(x, y)
+            }
+        })
+        .collect::<Vec<_>>();
+
     draw_target.draw_glyphs(
         &font,
         FONT_SIZE,
-        &text
-            .chars()
-            .map(|c| font.glyph_for_char(c).unwrap_or_default())
-            .collect::<Vec<_>>(),
-        &text
-            .chars()
-            .map({
-                let x = Cell::new(FONT_SIZE / 6.0);
-                let y = Cell::new(TEXT_OFFSET_Y);
-                move |c| {
-                    let p = Point::new(x.get(), y.get());
-                    if c == '\n' {
-                        x.replace(FONT_SIZE / 6.0);
-                        y.replace(y.get() + FONT_SIZE);
-                    } else {
-                        x.replace(x.get() + FONT_SIZE / 2.0);
-                    }
-                    p
-                }
-            })
-            .collect::<Vec<_>>(),
+        &char_ids,
+        &char_positions,
         color,
         &DRAW_OPTIONS,
     );
@@ -152,7 +159,7 @@ pub fn draw<'a>(
     }
 
     // Paint window border in case it's in focus
-    if unsafe { GetFocus() } == hwnd {
+    if is_focused(hwnd) {
         let mut pb = PathBuilder::new();
         pb.rect(0.0, 0.0, WIDTH as f32, HEIGHT as f32);
         draw_target.stroke(

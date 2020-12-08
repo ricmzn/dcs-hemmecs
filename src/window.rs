@@ -186,3 +186,7 @@ pub fn show_message_box(msg_type: MessageBoxType) -> bool {
         MessageBoxA(NULL(), message.as_ptr(), title, flags) == IDOK
     }
 }
+
+pub fn is_focused(hwnd: HWND) -> bool {
+    unsafe { GetFocus() == hwnd }
+}
