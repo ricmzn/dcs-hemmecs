@@ -11,7 +11,7 @@ use crate::{
         TEXT_OFFSET_Y, WIDTH,
     },
     data::{FlightData, UnitSystem},
-    window::is_focused,
+    windows::is_focused,
 };
 
 const WEAPON_CODE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?:\w+[-.])?(\w+)(?:\s.+)?").unwrap());

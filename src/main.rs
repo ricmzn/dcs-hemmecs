@@ -2,7 +2,7 @@ mod config;
 mod consts;
 mod data;
 mod drawing;
-mod window;
+mod windows;
 mod worker;
 
 use crossbeam::scope;
@@ -16,7 +16,7 @@ use config::load_or_create_config;
 use config::Config;
 use consts::{COULD_NOT_CREATE_CONFIG, DEFAULT_FONT, FIRST_TIME_MESSAGE, HEIGHT, WIDTH};
 use data::ApplicationState;
-use window::{create_window, run_window_loop, show_message_box, MessageBoxType};
+use windows::{main_window, run_window_loop, show_message_box, MessageBoxType};
 use worker::{run_config_worker, run_data_worker};
 
 fn main() {
@@ -66,8 +66,8 @@ fn main() {
         scope.spawn(|_| run_config_worker(config_handle, config_notifier, &quit_signal));
         scope.spawn(|_| run_data_worker(data_handle, &quit_signal));
 
-        // Create the window
-        let window = create_window(&state);
+        // Create the main window
+        let window = main_window::create(&state);
         run_window_loop(window, &quit_signal);
     });
 
