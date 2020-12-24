@@ -12,6 +12,8 @@ winapi = { version = "0.3", features = ["libloaderapi", "winuser", "errhandlinga
 regex = { version = "1", default_features = false, features = ["std", "perf-cache", "perf-dfa", "unicode-perl"] }
 raqote = { git = "https://github.com/ricmzn/raqote.git", branch = "0.8" }
 glm = { package = "nalgebra-glm", version = "0.3" }
+native-windows-derive = "1"
+native-windows-gui = "1"
 crossbeam = "0.8"
 font-kit = "0.7"
 notify = "4"

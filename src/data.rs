@@ -4,7 +4,7 @@ use serde::Deserialize;
 use std::cell::RefCell;
 use std::sync::RwLock;
 
-use crate::config::{Config, Occlusion};
+use crate::config::{Config, ConfigHandle, Occlusion};
 
 trait ToDegrees {
     fn to_degrees(&self) -> Self;
@@ -224,5 +224,5 @@ pub struct ApplicationState {
     pub flight_data: RwLock<Option<FlightData>>,
     pub draw_target: RefCell<DrawTarget>,
     pub font: RefCell<Font>,
-    pub config: RwLock<Config>,
+    pub config: ConfigHandle,
 }

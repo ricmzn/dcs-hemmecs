@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::fs::{rename, File};
 use std::io::{ErrorKind, Read, Write};
 use std::sync::mpsc::{channel, Receiver};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use crate::consts::CONFIG_FILE;
@@ -51,6 +52,8 @@ pub struct Config {
     pub occlusion: Occlusion,
     pub appearance: Appearance,
 }
+
+pub type ConfigHandle = Arc<Mutex<Config>>;
 
 fn watch(path: &str) -> Result<(impl notify::Watcher, Receiver<notify::DebouncedEvent>)> {
     let (sender, receiver) = channel();

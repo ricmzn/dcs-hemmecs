@@ -11,15 +11,15 @@ use crate::consts::{HEIGHT, WIDTH};
 use crate::drawing::draw;
 use crate::ApplicationState;
 
-const COLORS: RGBQUAD = RGBQUAD {
-    rgbRed: 0xff,
-    rgbGreen: 0xff,
-    rgbBlue: 0xff,
-    rgbReserved: 0x00,
-};
+const REFRESH_TIMER: usize = 1;
 
 const BMP_INFO: BITMAPINFO = BITMAPINFO {
-    bmiColors: [COLORS],
+    bmiColors: [RGBQUAD {
+        rgbRed: 0xff,
+        rgbGreen: 0xff,
+        rgbBlue: 0xff,
+        rgbReserved: 0x00,
+    }],
     bmiHeader: BITMAPINFOHEADER {
         biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
         biWidth: WIDTH,
@@ -52,7 +52,7 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
                 // Unpack the data fields
                 let mut draw_target = data.draw_target.borrow_mut();
                 let flight_data = { data.flight_data.read().unwrap().clone() };
-                let config = { data.config.read().unwrap().clone() };
+                let config = { data.config.lock().unwrap().clone() };
                 let font = data.font.borrow();
 
                 // Copy image data to window
@@ -83,18 +83,19 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
             }
 
             // Force next redraw as soon as possible
-            InvalidateRect(hwnd, NULL(), 0);
-            0
-        }
-        WM_KEYDOWN if wparam == VK_ESCAPE as usize => {
-            PostMessageA(hwnd, WM_CLOSE, 0, 0);
+            unsafe extern "system" fn refresh(hwnd: HWND, _: u32, _: usize, _: u32) {
+                InvalidateRect(hwnd, NULL(), 0);
+            }
+            SetTimer(hwnd, REFRESH_TIMER, 10, Some(refresh));
+
+            // Return zero to signal the message was handled
             0
         }
         _ => DefWindowProcA(hwnd, msg, wparam, lparam),
     }
 }
 
-pub fn create(window_data: &Pin<Box<ApplicationState>>) -> HWND {
+pub fn create(window_data: &Pin<Box<ApplicationState>>, parent: HWND) -> HWND {
     let instance = unsafe { GetModuleHandleA(NULL()) };
     let class_name = CString::new("HMDWindow").unwrap();
     let title = CString::new("HMD").unwrap();
@@ -122,12 +123,12 @@ pub fn create(window_data: &Pin<Box<ApplicationState>>) -> HWND {
             WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TRANSPARENT,
             class_name.as_ptr(),
             title.as_ptr(),
-            WS_VISIBLE | WS_POPUP,
+            WS_VISIBLE | WS_CHILD | WS_POPUP,
             screen_width / 2 - WIDTH / 2,
             screen_height / 2 - HEIGHT / 2 - screen_height / 10,
             WIDTH,
             HEIGHT,
-            NULL(),
+            parent as *const _ as *mut _,
             NULL(),
             instance,
             // &T -> *const T -> *mut c_void

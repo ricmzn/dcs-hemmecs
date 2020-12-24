@@ -7,18 +7,21 @@ mod drawing;
 mod windows;
 mod worker;
 
+extern crate native_windows_derive as nwd;
+extern crate native_windows_gui as nwg;
+
 use crossbeam::scope;
 use font_kit::handle::Handle;
 use raqote::DrawTarget;
 use std::cell::RefCell;
 use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 
-use config::load_or_create_config;
 use config::Config;
+use config::{load_or_create_config, ConfigHandle};
 use consts::{COULD_NOT_CREATE_CONFIG, DEFAULT_FONT, FIRST_TIME_MESSAGE, HEIGHT, WIDTH};
 use data::ApplicationState;
-use windows::{main_window, run_window_loop, show_message_box, MessageBoxType};
+use windows::{hmd_window, run_window_loop, show_message_box, MessageBoxType};
 use worker::{run_config_worker, run_data_worker};
 
 fn main() {
@@ -52,25 +55,30 @@ fn main() {
         }
     };
 
+    // Put the config in an Arc<Mutex<T>> for sharing between threads
+    let config: ConfigHandle = Arc::new(Mutex::new(config));
+
     // Pin the data to make sure the pointer we use later (in window_proc) can't point to a dropped value
     let state = Box::pin(ApplicationState {
         flight_data: RwLock::new(None),
         draw_target: RefCell::new(DrawTarget::new(WIDTH, HEIGHT)),
         font: RefCell::new(default_font),
-        config: RwLock::new(config),
+        config: Arc::clone(&config),
     });
 
     // Use crossbeam's thread scope feature to keep lifetimes tidy as the worker threads don't need to run beyond the main thread
-    let config_handle = &state.config;
     let data_handle = &state.flight_data;
     let thread_scope = scope(|scope| {
         // Create the worker thread
-        scope.spawn(|_| run_config_worker(config_handle, config_notifier, &quit_signal));
+        scope.spawn(|_| run_config_worker(Arc::clone(&config), config_notifier, &quit_signal));
         scope.spawn(|_| run_data_worker(data_handle, &quit_signal));
 
-        // Create the main window
-        let window = main_window::create(&state);
-        run_window_loop(window, &quit_signal);
+        // Create the two windows
+        let control_window = windows::control_window::create().unwrap();
+        let _hmd_window = hmd_window::create(&state, control_window.hwnd());
+        control_window.set_config(Some(Arc::clone(&config)));
+        control_window.set_status_text("Not connected");
+        run_window_loop(control_window.hwnd(), &quit_signal);
     });
 
     thread_scope.expect("Error caught in worker thread");

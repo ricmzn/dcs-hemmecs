@@ -273,6 +273,8 @@ dependencies = [
  "crossbeam",
  "font-kit",
  "nalgebra-glm",
+ "native-windows-derive",
+ "native-windows-gui",
  "notify",
  "once_cell",
  "raqote",
@@ -659,6 +661,30 @@ dependencies = [
  "approx",
  "nalgebra",
  "num-traits",
+]
+
+[[package]]
+name = "native-windows-derive"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e12bdd46113e604a98d04f19f79249e1679be21a65eaa1dbadec16ba00c94f7"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "native-windows-gui"
+version = "1.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe8d44e6cea6bba40a302d1ab3ee50c6d9f9714ab94a776b0db0a5521c49c9ce"
+dependencies = [
+ "bitflags",
+ "lazy_static",
+ "stretch",
+ "winapi 0.3.9",
+ "winapi-build",
 ]
 
 [[package]]
@@ -1062,6 +1088,16 @@ name = "slab"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
+
+[[package]]
+name = "stretch"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b0dc6d20ce137f302edf90f9cd3d278866fd7fb139efca6f246161222ad6d87"
+dependencies = [
+ "lazy_static",
+ "libm",
+]
 
 [[package]]
 name = "sw-composite"

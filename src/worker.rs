@@ -9,7 +9,7 @@ use std::sync::RwLock;
 use std::thread::sleep;
 use std::time::Duration;
 
-use crate::config::{read_existing_config, Config};
+use crate::config::{read_existing_config, ConfigHandle};
 use crate::data::FlightData;
 
 fn handle_data_connection(
@@ -74,16 +74,13 @@ pub fn run_data_worker(data_handle: &RwLock<Option<FlightData>>, quit_signal: &A
     }
 }
 
-fn try_config_reload(
-    config: &RwLock<Config>,
-    notifier: &Receiver<notify::DebouncedEvent>,
-) -> Result<()> {
+fn reload_config(config: &ConfigHandle, notifier: &Receiver<notify::DebouncedEvent>) -> Result<()> {
     match notifier.recv_timeout(Duration::from_millis(500))? {
         DebouncedEvent::Write(_) => {
-            println!("Updating config");
+            println!("Reloading config");
             let mut write_lock = config
-                .write()
-                .map_err(|err| anyhow!("Unable to update config: {:?}", err))?;
+                .lock()
+                .map_err(|err| anyhow!("Unable to reload config: {:?}", err))?;
             *write_lock = read_existing_config()?;
         }
         _ => (),
@@ -92,13 +89,13 @@ fn try_config_reload(
 }
 
 pub fn run_config_worker(
-    config: &RwLock<Config>,
+    config: ConfigHandle,
     notifier: Option<Receiver<notify::DebouncedEvent>>,
     quit_signal: &AtomicBool,
 ) {
     if let Some(notifier) = notifier {
         while quit_signal.load(Relaxed) == false {
-            if let Err(err) = try_config_reload(&config, &notifier) {
+            if let Err(err) = reload_config(&config, &notifier) {
                 if err.downcast_ref::<RecvTimeoutError>().is_none() {
                     eprintln!(
                         "Error while receiving config change notification: {:?}",
