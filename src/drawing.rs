@@ -62,6 +62,78 @@ fn draw_text(draw_target: &mut DrawTarget, font: &Font, color: &Source, text: &s
     );
 }
 
+fn render_data(data: &FlightData) -> String {
+    // Convert units as necessary
+    let unit_system = data.get_unit_system();
+    let (ias, ias_digits, alt, alt_digits) = match unit_system {
+        // m/s -> km/h and m
+        UnitSystem::Metric => (data.ias * 3.6, 4, data.alt, 5),
+        // m/s -> kn and m -> ft
+        UnitSystem::Imperial => (data.ias * 1.943844, 3, data.alt * 3.28084, 5),
+    };
+    // Generate the output text
+    format!(
+        "{}\n{}\n\n\n\n\n\n\n\n\n\n\n\n{}\n{}\n{}",
+        format!("                   {:0>3.0}", data.yaw.to_degrees()),
+        two_columns(
+            &format!("[{0:>1$.0}]", ias, ias_digits),
+            &format!("[{0:>1$.0}]", alt, alt_digits)
+        ),
+        // 3rd line from bottom
+        {
+            let mach_str = format!("M {:.2}", data.mach);
+            if let Some(weapon) = &data.weapons {
+                let weapon_str = if let Some(current) = &weapon.current {
+                    // Remove the prefix and suffix for brevity
+                    let short_name = WEAPON_CODE
+                        .captures(&current.name)
+                        .and_then(|captures| captures.get(1))
+                        .map(|m| m.as_str())
+                        .unwrap_or(&current.name);
+
+                    format!("{} {}", short_name, current.count)
+                } else {
+                    String::new()
+                };
+                two_columns(&mach_str, &weapon_str)
+            } else {
+                mach_str
+            }
+        },
+        // 2nd line from bottom
+        {
+            let g_str = format!("G {:.1}", data.g.y);
+            if let Some(weapon) = &data.weapons {
+                // G-force and cannon ammo
+                let shells_str = format!("GUN {}", weapon.shells);
+                two_columns(&g_str, &shells_str)
+            } else {
+                // Just g-force
+                g_str
+            }
+        },
+        // last line
+        {
+            let aoa_str = format!("a {:.1}", data.aoa);
+            if let Some(engine_data) = &data.engine_data {
+                // AoA and total fuel (FC3 only)
+                let fuel_str = match unit_system {
+                    // kg
+                    UnitSystem::Metric => format!("{:.0} kg", engine_data.total_fuel()),
+                    // kg -> lb
+                    UnitSystem::Imperial => {
+                        format!("{:.0} lbs", engine_data.total_fuel() * 2.204622622)
+                    }
+                };
+                two_columns(&aoa_str, &fuel_str)
+            } else {
+                // Just AoA
+                aoa_str
+            }
+        }
+    )
+}
+
 pub fn draw<'a>(
     hwnd: HWND,
     config: &Config,
@@ -73,7 +145,10 @@ pub fn draw<'a>(
 
     let color = rgb(config.appearance.color);
 
-    if let Some(data) = data {
+    if config.show_sample_data {
+        let sample_data = render_data(&FlightData::sample());
+        draw_text(draw_target, &default_font, &color, &sample_data);
+    } else if let Some(data) = data {
         let cockpit_params = data.parse_cockpit_params().unwrap_or_default();
         let camera_angles = data.camera_angles();
 
@@ -82,76 +157,9 @@ pub fn draw<'a>(
         } else if FlightData::is_occluded(camera_angles, &config) {
             String::from("*")
         } else {
-            // Convert units as necessary
-            let unit_system = data.get_unit_system();
-            let (ias, ias_digits, alt, alt_digits) = match unit_system {
-                // m/s -> km/h and m
-                UnitSystem::Metric => (data.ias * 3.6, 4, data.alt, 5),
-                // m/s -> kn and m -> ft
-                UnitSystem::Imperial => (data.ias * 1.943844, 3, data.alt * 3.28084, 5),
-            };
-            // Generate the output text
-            format!(
-                "{}\n{}\n\n\n\n\n\n\n\n\n\n\n\n{}\n{}\n{}",
-                format!("                   {:0>3.0}", data.yaw.to_degrees()),
-                two_columns(
-                    &format!("[{0:>1$.0}]", ias, ias_digits),
-                    &format!("[{0:>1$.0}]", alt, alt_digits)
-                ),
-                // 3rd line from bottom
-                {
-                    let mach_str = format!("M {:.2}", data.mach);
-                    if let Some(weapon) = &data.weapons {
-                        let weapon_str = if let Some(current) = &weapon.current {
-                            // Remove the prefix and suffix for brevity
-                            let short_name = WEAPON_CODE
-                                .captures(&current.name)
-                                .and_then(|captures| captures.get(1))
-                                .map(|m| m.as_str())
-                                .unwrap_or(&current.name);
-
-                            format!("{} {}", short_name, current.count)
-                        } else {
-                            String::new()
-                        };
-                        two_columns(&mach_str, &weapon_str)
-                    } else {
-                        mach_str
-                    }
-                },
-                // 2nd line from bottom
-                {
-                    let g_str = format!("G {:.1}", data.g.y);
-                    if let Some(weapon) = &data.weapons {
-                        // G-force and cannon ammo
-                        let shells_str = format!("GUN {}", weapon.shells);
-                        two_columns(&g_str, &shells_str)
-                    } else {
-                        // Just g-force
-                        g_str
-                    }
-                },
-                // last line
-                {
-                    let aoa_str = format!("a {:.1}", data.aoa);
-                    if let Some(engine_data) = &data.engine_data {
-                        // AoA and total fuel (FC3 only)
-                        let fuel_str = match unit_system {
-                            // kg
-                            UnitSystem::Metric => format!("{:.0} kg", engine_data.total_fuel()),
-                            // kg -> lb
-                            UnitSystem::Imperial => {
-                                format!("{:.0} lbs", engine_data.total_fuel() * 2.204622622)
-                            }
-                        };
-                        two_columns(&aoa_str, &fuel_str)
-                    } else {
-                        // Just AoA
-                        aoa_str
-                    }
-                }
-            )
+            render_data(&data)
         };
+
         draw_text(draw_target, &default_font, &color, &text);
     } else {
         draw_text(draw_target, &default_font, &color, "Not Connected");

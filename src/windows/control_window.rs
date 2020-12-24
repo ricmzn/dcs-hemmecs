@@ -109,6 +109,9 @@ pub struct ControlWindow {
     hide_in_cockpit_checkbox: CheckBox,
 
     #[nwg_control(text: "Show sample data")]
+    #[nwg_events(
+        OnButtonClick: [ControlWindow::save_config]
+    )]
     #[nwg_layout_item(layout: grid, row: 11, col_span: 8)]
     sample_checkbox: CheckBox,
 }
@@ -149,6 +152,11 @@ impl ControlWindow {
                 true => CheckBoxState::Checked,
                 false => CheckBoxState::Unchecked,
             });
+        self.sample_checkbox
+            .set_check_state(match config.show_sample_data {
+                true => CheckBoxState::Checked,
+                false => CheckBoxState::Unchecked,
+            });
     }
 
     fn save_config(&self) {
@@ -161,6 +169,7 @@ impl ControlWindow {
                 self.hide_on_hud_checkbox.check_state() == CheckBoxState::Checked;
             config.occlusion.hide_in_cockpit =
                 self.hide_in_cockpit_checkbox.check_state() == CheckBoxState::Checked;
+            config.show_sample_data = self.sample_checkbox.check_state() == CheckBoxState::Checked;
         }
     }
 

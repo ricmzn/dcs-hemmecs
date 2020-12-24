@@ -51,6 +51,9 @@ impl Default for Appearance {
 pub struct Config {
     pub occlusion: Occlusion,
     pub appearance: Appearance,
+
+    #[serde(skip)]
+    pub show_sample_data: bool,
 }
 
 pub type ConfigHandle = Arc<Mutex<Config>>;
