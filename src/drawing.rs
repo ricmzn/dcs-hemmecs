@@ -22,7 +22,7 @@ fn two_columns(left: &str, right: &str) -> String {
         "{left}{right:>padding$}",
         left = left,
         right = right,
-        padding = TEXT_COLUMNS as usize - left.len()
+        padding = TEXT_COLUMNS as usize - left.len() - 1
     )
 }
 
