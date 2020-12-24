@@ -5,31 +5,16 @@ use std::ffi::CString;
 use std::ptr::null_mut as NULL;
 use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
 use winapi::shared::windef::HWND;
-use winapi::um::winuser::{
-    DispatchMessageA, GetFocus, MessageBoxA, PeekMessageA, TranslateMessage, IDOK, MB_ICONERROR,
-    MB_ICONINFORMATION, MSG, PM_REMOVE,
-};
+use winapi::um::winuser::{GetFocus, MessageBoxA, IDOK, MB_ICONERROR, MB_ICONINFORMATION};
 
 /// Blocks execution of current thread while window is open and all worker threads are running
 /// # Safety
 /// `hwnd` must be a valid window handle, otherwise this results in undefined behavior
-pub fn run_window_loop(hwnd: HWND, quit_signal: &AtomicBool) {
+pub fn run_window_loop(_: HWND, quit_signal: &AtomicBool) {
     // Run look while other threads are running
     while quit_signal.load(Relaxed) == false {
         nwg::dispatch_thread_events();
         quit_signal.store(true, Relaxed);
-        // unsafe {
-        //     let mut msg: MSG = std::mem::zeroed();
-        //     // Process Windows event messages
-        //     if PeekMessageA(&mut msg as *mut _, hwnd, 0, 0, PM_REMOVE) > 0 {
-        //         TranslateMessage(&msg as *const _);
-        //         DispatchMessageA(&msg as *const _);
-        //     } else {
-        //         // Notify other threads that the window has been closed
-        //         quit_signal.store(true, Relaxed);
-        //         break;
-        //     }
-        // }
     }
 }
 
