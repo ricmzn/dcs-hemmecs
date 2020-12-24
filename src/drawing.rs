@@ -30,7 +30,6 @@ fn two_columns(left: &str, right: &str) -> String {
 fn draw_text(draw_target: &mut DrawTarget, font: &Font, color: &Source, text: &str) {
     let char_ids = text
         .chars()
-        .filter(|&c| c != '\n')
         .map(|c| font.glyph_for_char(c).unwrap_or_default())
         .collect::<Vec<_>>();
 
