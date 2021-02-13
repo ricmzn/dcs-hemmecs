@@ -3,6 +3,7 @@ local server = nil
 
 package.path  = package.path..";"..lfs.currentdir().."/LuaSocket/?.lua"
 package.cpath = package.cpath..";"..lfs.currentdir().."/LuaSocket/?.dll"
+package.path  = package.path..";"..lfs.currentdir().."/Scripts/?.lua"
 local socket = require("socket")
 local json = require("json")
 
