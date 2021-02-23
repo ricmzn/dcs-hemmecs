@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use nwd::NwgUi;
 use nwg::{
     Button, CheckBox, CheckBoxState, ColorDialog, Font, Frame, GridLayout, Label, NativeUi,
@@ -9,6 +9,7 @@ use std::cell::{Cell, RefCell};
 use winapi::shared::windef::HWND;
 
 use crate::config::{Config, ConfigHandle};
+use crate::installer::{self, DCSVersion, InstallStatus};
 
 const HEADING_FONT: Lazy<Font> = Lazy::new(|| {
     let mut font = Default::default();
@@ -39,7 +40,7 @@ pub struct ControlWindow {
     #[nwg_control(text: "", parent: status_frame, size: (1000, 40))]
     status_text: Label,
 
-    #[nwg_control(font: Some(&HEADING_FONT), text: "Install")]
+    #[nwg_control(font: Some(&HEADING_FONT), text: "Installer")]
     #[nwg_layout_item(layout: grid, row: 1, col_span: 8)]
     install_title: Label,
 
@@ -48,6 +49,9 @@ pub struct ControlWindow {
     install_stable_label: Label,
 
     #[nwg_control(text: "Not Detected", enabled: false)]
+    #[nwg_events(
+        OnButtonClick: [ControlWindow::install_stable]
+    )]
     #[nwg_layout_item(layout: grid, row: 2, col: 3, col_span: 5)]
     install_stable_button: Button,
 
@@ -55,7 +59,10 @@ pub struct ControlWindow {
     #[nwg_layout_item(layout: grid, row: 3, col_span: 3)]
     install_openbeta_label: Label,
 
-    #[nwg_control(text: "Not Detected", enabled: false)]
+    #[nwg_control(text: "Not Found", enabled: false)]
+    #[nwg_events(
+        OnButtonClick: [ControlWindow::install_openbeta]
+    )]
     #[nwg_layout_item(layout: grid, row: 3, col: 3, col_span: 5)]
     install_openbeta_button: Button,
 
@@ -170,6 +177,56 @@ impl ControlWindow {
             config.occlusion.hide_in_cockpit =
                 self.hide_in_cockpit_checkbox.check_state() == CheckBoxState::Checked;
             config.show_sample_data = self.sample_checkbox.check_state() == CheckBoxState::Checked;
+        }
+    }
+
+    fn set_installer_state(&self, install_button: &Button, status: &InstallStatus) {
+        match status {
+            InstallStatus::DCSNotFound => {
+                install_button.set_enabled(false);
+                install_button.set_text("Not Found");
+            }
+            InstallStatus::NotInstalled => {
+                install_button.set_enabled(true);
+                install_button.set_text("Install");
+            }
+            InstallStatus::RequiresUpdate => {
+                install_button.set_enabled(true);
+                install_button.set_text("Update");
+            }
+            InstallStatus::Installed => {
+                install_button.set_enabled(true);
+                install_button.set_text("Uninstall");
+            }
+        }
+    }
+
+    fn run_installer(&self, dcs_version: &DCSVersion) -> Result<()> {
+        match dcs_version.install_status()? {
+            InstallStatus::NotInstalled => installer::install(&dcs_version),
+            InstallStatus::RequiresUpdate => {
+                installer::uninstall(&dcs_version)?;
+                installer::install(&dcs_version)
+            }
+            InstallStatus::Installed => installer::uninstall(&dcs_version),
+            InstallStatus::DCSNotFound => Err(anyhow!("Cannot install in non existing DCS folder")),
+        }
+    }
+
+    fn install_stable(&self) {
+        self.run_installer(&DCSVersion::Stable).unwrap()
+    }
+
+    fn install_openbeta(&self) {
+        self.run_installer(&DCSVersion::Openbeta).unwrap()
+    }
+
+    pub fn update_install_status(&self) {
+        if let Ok(status) = DCSVersion::Stable.install_status() {
+            self.set_installer_state(&self.install_stable_button, &status);
+        }
+        if let Ok(status) = DCSVersion::Openbeta.install_status() {
+            self.set_installer_state(&self.install_openbeta_button, &status);
         }
     }
 

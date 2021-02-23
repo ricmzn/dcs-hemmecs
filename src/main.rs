@@ -4,6 +4,7 @@ mod config;
 mod consts;
 mod data;
 mod drawing;
+mod installer;
 mod windows;
 mod worker;
 
@@ -12,6 +13,7 @@ extern crate native_windows_gui as nwg;
 
 use crossbeam::scope;
 use font_kit::handle::Handle;
+use installer::DCSVersion;
 use raqote::DrawTarget;
 use std::cell::RefCell;
 use std::sync::atomic::AtomicBool;
@@ -25,6 +27,12 @@ use windows::{hmd_window, run_window_loop, show_message_box, MessageBoxType};
 use worker::{run_config_worker, run_data_worker};
 
 fn main() {
+    println!(
+        "Detected DCS paths:\n  Openbeta: {:?}\n  Stable: {:?}",
+        DCSVersion::Stable.user_folder(),
+        DCSVersion::Openbeta.user_folder()
+    );
+
     // Pre-load the font embedded in the program
     let default_font = Handle::from_memory(Arc::new(DEFAULT_FONT.into()), 0)
         .load()
@@ -76,6 +84,7 @@ fn main() {
         // Create the two windows
         let control_window = windows::control_window::create().unwrap();
         let _hmd_window = hmd_window::create(&state, control_window.hwnd());
+        control_window.update_install_status();
         control_window.set_config(Some(Arc::clone(&config)));
         control_window.set_status_text("Not connected");
         run_window_loop(control_window.hwnd(), &quit_signal);
