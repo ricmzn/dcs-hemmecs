@@ -224,10 +224,20 @@ impl FlightData {
             ias: 350.0 / 1.943844,
             alt: 22500.0 / 3.28084,
             yaw: f32::to_radians(165.0),
-            g: dcs::Vec3 { y: 1.2, ..Default::default() },
+            g: dcs::Vec3 {
+                y: 1.2,
+                ..Default::default()
+            },
             mach: 0.56,
             aoa: 2.8,
             unit: String::from("F-15"),
+            weapons: Some(dcs::WeaponData {
+                current: Some(dcs::WeaponDetails {
+                    name: String::from("AIM-120C"),
+                    count: 4,
+                }),
+                shells: 180,
+            }),
             ..Default::default()
         }
     }
