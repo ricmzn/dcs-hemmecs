@@ -44,7 +44,7 @@ pub struct ControlWindow {
     #[nwg_layout_item(layout: grid, row: 1, col_span: 8)]
     install_title: Label,
 
-    #[nwg_control(text: "Stable:")]
+    #[nwg_control(text: "DCS Stable:")]
     #[nwg_layout_item(layout: grid, row: 2, col_span: 3)]
     install_stable_label: Label,
 
@@ -55,7 +55,7 @@ pub struct ControlWindow {
     #[nwg_layout_item(layout: grid, row: 2, col: 3, col_span: 5)]
     install_stable_button: Button,
 
-    #[nwg_control(text: "Openbeta:")]
+    #[nwg_control(text: "DCS Openbeta:")]
     #[nwg_layout_item(layout: grid, row: 3, col_span: 3)]
     install_openbeta_label: Label,
 
@@ -188,15 +188,15 @@ impl ControlWindow {
             }
             InstallStatus::NotInstalled => {
                 install_button.set_enabled(true);
-                install_button.set_text("Install");
+                install_button.set_text("Install Hemmecs");
             }
             InstallStatus::RequiresUpdate => {
                 install_button.set_enabled(true);
-                install_button.set_text("Update");
+                install_button.set_text("Update Hemmecs");
             }
             InstallStatus::Installed => {
                 install_button.set_enabled(true);
-                install_button.set_text("Uninstall");
+                install_button.set_text("Uninstall Hemmecs");
             }
         }
     }

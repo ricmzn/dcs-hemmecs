@@ -1,0 +1,2 @@
+local hemmecsStatus, hemmecsErr = pcall(function() local hemmecsLfs=require('lfs'); dofile(hemmecsLfs.writedir()..'Scripts/HemmecsExport.lua'); end);
+if not hemmecsStatus then log.write("HEMMECS.EXPORT", log.ERROR, hemmecsErr) end;

@@ -1,5 +1,15 @@
 use anyhow::{anyhow, Result};
-use std::path::{Path, PathBuf};
+use std::fs::File;
+use std::{
+    io::Read,
+    path::{Path, PathBuf},
+};
+
+const HEMMECS_EXPORT_SNIPPET: &str = include_str!("../lua/Scripts/Export.lua.snippet");
+const HEMMECS_EXPORT_SCRIPT: &str = include_str!("../lua/Scripts/HemmecsExport.lua");
+const HEMMECS_EXPORT_SCRIPT_PATH: &str = "Scripts/HemmecsExport.lua";
+const DCS_EXPORT_LUA_PATH: &str = "Scripts/Export.lua";
+const HEMMECS_VARS: &[&str] = &["hemmecsStatus", "hemmecsErr"];
 
 /// Gets the user's Saved Games folder path through native Windows APIs
 pub fn saved_games() -> Result<PathBuf> {
@@ -41,10 +51,6 @@ pub fn saved_games() -> Result<PathBuf> {
     }
 }
 
-const HEMMECS_EXPORT_SNIPPET: &str = include_str!("../lua/Scripts/Export.lua.snippet");
-const HEMMECS_EXPORT_SCRIPT: &str = include_str!("../lua/Scripts/HemmecsExport.lua");
-const HEMMECS_VARS: &[&str] = &["hemmecsStatus", "hemmecsErr"];
-
 pub enum DCSVersion {
     Stable,
     Openbeta,
@@ -67,9 +73,26 @@ impl DCSVersion {
     }
 
     pub fn install_status(&self) -> Result<InstallStatus> {
-        match Path::is_dir(&self.user_folder()?) {
-            true => Ok(InstallStatus::NotInstalled),
+        let user_folder = self.user_folder()?;
+        match Path::is_dir(&user_folder) {
             false => Ok(InstallStatus::DCSNotFound),
+            true => {
+                let mut export_script_path = user_folder.clone();
+                export_script_path.push(HEMMECS_EXPORT_SCRIPT_PATH);
+                if !Path::exists(&export_script_path) {
+                    Ok(InstallStatus::NotInstalled)
+                } else {
+                    if File::open(&export_script_path)?
+                        .bytes()
+                        .map(Result::unwrap)
+                        .eq(HEMMECS_EXPORT_SCRIPT.bytes())
+                    {
+                        Ok(InstallStatus::Installed)
+                    } else {
+                        Ok(InstallStatus::RequiresUpdate)
+                    }
+                }
+            }
         }
     }
 }
