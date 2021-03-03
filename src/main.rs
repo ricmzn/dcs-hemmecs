@@ -27,6 +27,12 @@ use windows::{hmd_window, run_window_loop, show_message_box, MessageBoxType};
 use worker::{run_config_worker, run_data_worker};
 
 fn main() {
+    let default_panic_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic_info| {
+        default_panic_hook(panic_info);
+        std::process::exit(1);
+    }));
+
     println!(
         "Detected DCS paths:\n  Openbeta: {:?}\n  Stable: {:?}",
         DCSVersion::Stable.user_folder(),
