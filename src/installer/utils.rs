@@ -1,5 +1,11 @@
-use anyhow::{anyhow, Result};
-use std::{ffi::OsString, os::windows::ffi::OsStringExt, path::PathBuf, ptr::null_mut, slice};
+use std::{
+    ffi::OsString,
+    io::{Error, ErrorKind, Result},
+    os::windows::ffi::OsStringExt,
+    path::PathBuf,
+    ptr::null_mut,
+    slice,
+};
 use winapi::{
     shared::{ntdef::PWSTR, winerror::S_OK},
     um::{
@@ -20,8 +26,9 @@ pub fn saved_games() -> Result<PathBuf> {
             &mut saved_games_str_ptr as *mut _,
         );
         if hresult != S_OK {
-            return Err(anyhow!(
-                "Unspecified error while looking for Saved Games folder"
+            return Err(Error::new(
+                ErrorKind::Other,
+                "Unspecified error while looking for Saved Games folder",
             ));
         }
         let saved_games_str_len = {

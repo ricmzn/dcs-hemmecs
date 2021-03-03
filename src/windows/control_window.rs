@@ -209,7 +209,9 @@ impl ControlWindow {
                 installer::install(&dcs_version)
             }
             InstallStatus::Installed => installer::uninstall(&dcs_version),
-            InstallStatus::DCSNotFound => Err(anyhow!("Cannot install in non existing DCS folder")),
+            InstallStatus::DCSNotFound => {
+                Err(anyhow!("Cannot install in non existing DCS folder",))
+            }
         }
     }
 
