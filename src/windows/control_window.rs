@@ -209,18 +209,18 @@ impl ControlWindow {
                 installer::install(&dcs_version)
             }
             InstallStatus::Installed => installer::uninstall(&dcs_version),
-            InstallStatus::DCSNotFound => {
-                Err(anyhow!("Cannot install in non existing DCS folder",))
-            }
+            InstallStatus::DCSNotFound => Err(anyhow!("Cannot install in non existing DCS folder")),
         }
     }
 
     fn install_stable(&self) {
-        self.run_installer(&DCSVersion::Stable).unwrap()
+        self.run_installer(&DCSVersion::Stable).unwrap();
+        self.update_install_status();
     }
 
     fn install_openbeta(&self) {
-        self.run_installer(&DCSVersion::Openbeta).unwrap()
+        self.run_installer(&DCSVersion::Openbeta).unwrap();
+        self.update_install_status();
     }
 
     pub fn update_install_status(&self) {
