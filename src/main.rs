@@ -26,12 +26,33 @@ use data::ApplicationState;
 use windows::{hmd_window, run_window_loop, show_message_box, MessageBoxType};
 use worker::{run_config_worker, run_data_worker};
 
-fn main() {
+fn set_panic_handler() {
     let default_panic_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |panic_info| {
         default_panic_hook(panic_info);
+        let default_message = String::from("Unspecified error");
+        let message = panic_info
+            .payload()
+            .downcast_ref::<String>()
+            .unwrap_or(&default_message);
+        let location = match panic_info.location() {
+            Some(location) => format!(
+                "in \"{}\" at line {}:\n\n",
+                location.file(),
+                location.line()
+            ),
+            None => String::new(),
+        };
+        windows::show_message_box(MessageBoxType::Error(format!(
+            "Fatal error {}{}",
+            location, message
+        )));
         std::process::exit(1);
     }));
+}
+
+fn main() {
+    set_panic_handler();
 
     println!(
         "Detected DCS paths:\n  Openbeta: {:?}\n  Stable: {:?}",
