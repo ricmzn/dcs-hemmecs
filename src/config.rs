@@ -55,8 +55,7 @@ pub struct Config {
 
 pub type ConfigHandle = Arc<Mutex<Config>>;
 
-/// If successful, returns the application config and a boolean indicating if the config was newly created on this call
-pub fn load_or_create_config() -> Result<(Config, bool)> {
+pub fn load_or_create_config() -> Result<Config> {
     // Try to open an existing config
     match File::open(CONFIG_FILE) {
         Ok(mut file) => {
@@ -80,7 +79,7 @@ pub fn load_or_create_config() -> Result<(Config, bool)> {
             rename(&tmp_filename, CONFIG_FILE)
                 .context("failed to overwrite config file with new values")?;
 
-            Ok((config, false))
+            Ok(config)
         }
         Err(error) => {
             if error.kind() == ErrorKind::NotFound {
@@ -95,7 +94,7 @@ pub fn load_or_create_config() -> Result<(Config, bool)> {
                         .as_bytes(),
                 )?;
 
-                Ok((default_config, true))
+                Ok(default_config)
             } else {
                 Err(error).context("failed to open config file")
             }
@@ -103,7 +102,6 @@ pub fn load_or_create_config() -> Result<(Config, bool)> {
     }
 }
 
-/// Save config changes to the file
 pub fn save_config(config: &Config) -> Result<()> {
     let tmp_filename = format!("{}.tmp", CONFIG_FILE);
     let mut tmp_file = File::create(&tmp_filename)?;

@@ -20,6 +20,7 @@ pub fn run_window_loop(_: HWND, quit_signal: &AtomicBool) {
 
 pub enum MessageBoxType {
     Error(String),
+    #[allow(dead_code)]
     Info(String),
 }
 

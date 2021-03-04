@@ -21,7 +21,7 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use config::Config;
 use config::{load_or_create_config, ConfigHandle};
-use consts::{COULD_NOT_CREATE_CONFIG, DEFAULT_FONT, FIRST_TIME_MESSAGE, HEIGHT, WIDTH};
+use consts::{DEFAULT_FONT, HEIGHT, WIDTH};
 use data::ApplicationState;
 use windows::{hmd_window, run_window_loop, show_message_box, MessageBoxType};
 use worker::run_data_worker;
@@ -71,11 +71,7 @@ fn main() {
     // Get the application configuration and its watcher + notifier combo
     // Note: we have to keep the watcher around even if we don't use it, or else it will be dropped and stop working
     let config = match load_or_create_config() {
-        Ok((config, false)) => config,
-        Ok((config, true)) => {
-            show_message_box(MessageBoxType::Info(FIRST_TIME_MESSAGE.into()));
-            config
-        }
+        Ok(config) => config,
         Err(err) if err.downcast_ref::<toml::de::Error>().is_some() => {
             show_message_box(MessageBoxType::Error(format!(
                 "Error while loading config file:\n\n{}",
@@ -84,8 +80,7 @@ fn main() {
             Config::default()
         }
         Err(err) => {
-            eprintln!("Internal error while loading/saving config file: {:?}", err);
-            show_message_box(MessageBoxType::Error(COULD_NOT_CREATE_CONFIG.into()));
+            eprintln!("Internal error while loading/creating config file: {:?}", err);
             Config::default()
         }
     };

@@ -27,13 +27,3 @@ pub fn rgb(rgb: (u8, u8, u8)) -> Source<'static> {
 }
 
 pub const CONFIG_FILE: &str = "dcs-hemmecs.toml";
-
-pub const COULD_NOT_CREATE_CONFIG: &str = "Oops! DCS Hemmecs tried to open or create a configuration file in this folder, but the permission was denied by Windows.
-
-For this reason, it's not recommended to run DCS Hemmecs from Program Files. However, the application will still run using default settings.";
-
-pub const FIRST_TIME_MESSAGE: &str = "It appears this is the first time you're running DCS Hemmecs!
-
-A configuration file (dcs-hemmecs.toml) has been created in this folder.
-
-You can find more information in the readme of the GitHub repository.";
