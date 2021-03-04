@@ -91,6 +91,12 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
             // Return zero to signal the message was handled
             0
         }
+        WM_ACTIVATE => {
+            if !GetParent(hwnd).is_null() {
+                BringWindowToTop(GetParent(hwnd));
+            }
+            DefWindowProcA(hwnd, msg, wparam, lparam)
+        }
         _ => DefWindowProcA(hwnd, msg, wparam, lparam),
     }
 }
