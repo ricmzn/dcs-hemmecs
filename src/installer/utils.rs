@@ -113,7 +113,7 @@ pub fn rewrite_export_lua_snippet(file: &mut File, reinstall: bool) -> Result<()
         export_lua_text
             .len()
             .try_into()
-            .context("New Export.lua contents are too long")?,
+            .context("new Export.lua contents are too long")?,
     )?;
 
     Ok(())
@@ -126,5 +126,5 @@ pub fn open_rw(path: &PathBuf) -> Result<File> {
         .write(true)
         .create(true)
         .open(path)
-        .context(format!("Cannot open {:?}", path))
+        .context(format!("cannot open {:?}", path))
 }

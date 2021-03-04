@@ -58,7 +58,7 @@ impl DCSVersion {
 pub fn install(dcs_version: &DCSVersion) -> Result<()> {
     // Ensure the scripts folder exists
     create_dir_all(dcs_version.user_folder()?.join("Scripts"))
-        .context("Could not ensure DCS Scripts folder exists")?;
+        .context("could not ensure DCS Scripts folder exists")?;
 
     // Overwrite the Hemmecs export script
     let mut export_script = utils::open_rw(

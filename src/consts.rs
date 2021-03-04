@@ -34,6 +34,6 @@ For this reason, it's not recommended to run DCS Hemmecs from Program Files. How
 
 pub const FIRST_TIME_MESSAGE: &str = "It appears this is the first time you're running DCS Hemmecs!
 
-A configuration file (dcs-hemmecs.toml) has been created in this folder. You can edit it to change settings as you see fit, and it will be reloaded in real-time.
+A configuration file (dcs-hemmecs.toml) has been created in this folder.
 
 You can find more information in the readme of the GitHub repository.";

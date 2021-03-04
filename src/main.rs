@@ -24,7 +24,7 @@ use config::{load_or_create_config, ConfigHandle};
 use consts::{COULD_NOT_CREATE_CONFIG, DEFAULT_FONT, FIRST_TIME_MESSAGE, HEIGHT, WIDTH};
 use data::ApplicationState;
 use windows::{hmd_window, run_window_loop, show_message_box, MessageBoxType};
-use worker::{run_config_worker, run_data_worker};
+use worker::run_data_worker;
 
 fn set_panic_handler() {
     let default_panic_hook = std::panic::take_hook();
@@ -70,23 +70,23 @@ fn main() {
 
     // Get the application configuration and its watcher + notifier combo
     // Note: we have to keep the watcher around even if we don't use it, or else it will be dropped and stop working
-    let (config, _config_watcher, config_notifier) = match load_or_create_config() {
-        Ok((config, watcher, notifier, false)) => (config, Some(watcher), Some(notifier)),
-        Ok((config, watcher, notifier, true)) => {
+    let config = match load_or_create_config() {
+        Ok((config, false)) => config,
+        Ok((config, true)) => {
             show_message_box(MessageBoxType::Info(FIRST_TIME_MESSAGE.into()));
-            (config, Some(watcher), Some(notifier))
+            config
         }
         Err(err) if err.downcast_ref::<toml::de::Error>().is_some() => {
             show_message_box(MessageBoxType::Error(format!(
                 "Error while loading config file:\n\n{}",
                 err
             )));
-            (Config::default(), None, None)
+            Config::default()
         }
         Err(err) => {
             eprintln!("Internal error while loading/saving config file: {:?}", err);
             show_message_box(MessageBoxType::Error(COULD_NOT_CREATE_CONFIG.into()));
-            (Config::default(), None, None)
+            Config::default()
         }
     };
 
@@ -105,7 +105,6 @@ fn main() {
     let data_handle = &state.flight_data;
     let thread_scope = scope(|scope| {
         // Create the worker thread
-        scope.spawn(|_| run_config_worker(Arc::clone(&config), config_notifier, &quit_signal));
         scope.spawn(|_| run_data_worker(data_handle, &quit_signal));
 
         // Create the two windows

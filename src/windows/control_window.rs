@@ -8,7 +8,7 @@ use once_cell::unsync::Lazy;
 use std::cell::{Cell, RefCell};
 use winapi::shared::windef::HWND;
 
-use crate::config::{Config, ConfigHandle};
+use crate::config::{self, Config, ConfigHandle};
 use crate::installer::{self, DCSVersion, InstallStatus};
 
 const HEADING_FONT: Lazy<Font> = Lazy::new(|| {
@@ -177,6 +177,9 @@ impl ControlWindow {
             config.occlusion.hide_in_cockpit =
                 self.hide_in_cockpit_checkbox.check_state() == CheckBoxState::Checked;
             config.show_sample_data = self.sample_checkbox.check_state() == CheckBoxState::Checked;
+            config::save_config(&config)
+                .map_err(|err| eprintln!("Failed to save config changes: {:?}", err))
+                .ok();
         }
     }
 
@@ -251,7 +254,7 @@ impl ControlWindow {
 pub use control_window_ui::ControlWindowUi;
 
 pub fn create() -> Result<ControlWindowUi> {
-    nwg::init().context("Failed to init Native Widnows GUI")?;
-    nwg::Font::set_global_family("Segoe UI").context("Failed to set default font")?;
-    Ok(ControlWindow::build_ui(Default::default()).context("Failed to build UI")?)
+    nwg::init().context("failed to initialize Native Widnows GUI")?;
+    nwg::Font::set_global_family("Segoe UI").context("failed to set default font")?;
+    Ok(ControlWindow::build_ui(Default::default()).context("failed to build UI")?)
 }
