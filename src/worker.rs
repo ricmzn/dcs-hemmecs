@@ -57,7 +57,7 @@ pub fn run_data_worker(data_handle: &RwLock<Option<FlightData>>, quit_signal: &A
                 // The export script is not running yet
                 Err(err) if err.kind() == ErrorKind::ConnectionRefused => (),
                 // Unexpected error
-                Err(err) => panic!(err),
+                Err(err) => panic!("{}", err),
             }
             // Wait a bit before trying to connect again
             sleep(Duration::from_millis(500));
