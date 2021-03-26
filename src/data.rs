@@ -56,7 +56,7 @@ pub mod dcs {
         pub y: Vec3,
         /// Orientation z-vector
         pub z: Vec3,
-        /// Position in world
+        /// World coordinates
         pub p: Vec3,
     }
 
@@ -143,7 +143,7 @@ pub struct FlightData {
 }
 
 impl FlightData {
-    /// Returns the direction where the camera is pointed relative to the plane
+    /// Returns the direction where the camera is pointed relative to the aircraft
     /// in the format (pitch, yaw, roll)
     pub fn camera_angles(&self) -> (f32, f32, f32) {
         let x_yaw = glm::rotate_vec3(&glm::Vec3::x_axis(), -self.yaw, &glm::Vec3::y_axis());
