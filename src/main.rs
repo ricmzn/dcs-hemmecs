@@ -31,10 +31,18 @@ fn set_panic_handler() {
     std::panic::set_hook(Box::new(move |panic_info| {
         default_panic_hook(panic_info);
         let default_message = String::from("Unspecified error");
-        let message = panic_info
+        let message_string = panic_info.payload().downcast_ref::<String>();
+        let message_str = panic_info
             .payload()
-            .downcast_ref::<String>()
-            .unwrap_or(&default_message);
+            .downcast_ref::<&str>()
+            .map(|&message| String::from(message));
+        let message = match &message_string {
+            Some(message) => message,
+            None => match &message_str {
+                Some(message) => message,
+                None => &default_message,
+            },
+        };
         let location = match panic_info.location() {
             Some(location) => format!(
                 "in \"{}\" at line {}:\n\n",
