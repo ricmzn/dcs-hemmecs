@@ -1,5 +1,6 @@
 pub mod control_window;
 pub mod hmd_window;
+pub mod terrain_window;
 
 use std::ffi::CString;
 use std::ptr::null_mut as NULL;

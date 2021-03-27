@@ -23,7 +23,7 @@ use config::Config;
 use config::{load_or_create_config, ConfigHandle};
 use consts::{DEFAULT_FONT, HEIGHT, WIDTH};
 use data::ApplicationState;
-use windows::{hmd_window, run_window_loop, show_message_box, MessageBoxType};
+use windows::{hmd_window, run_window_loop, show_message_box, terrain_window, MessageBoxType};
 use worker::run_data_worker;
 
 fn set_panic_handler() {
@@ -88,7 +88,10 @@ fn main() {
             Config::default()
         }
         Err(err) => {
-            eprintln!("Internal error while loading/creating config file: {:?}", err);
+            eprintln!(
+                "Internal error while loading/creating config file: {:?}",
+                err
+            );
             Config::default()
         }
     };
@@ -110,7 +113,10 @@ fn main() {
         // Create the worker thread
         scope.spawn(|_| run_data_worker(data_handle, &quit_signal));
 
-        // Create the two windows
+        // Create the terrain visualizer thread
+        scope.spawn(|_| terrain_window::create(data_handle));
+
+        // Create the two main windows
         let control_window = windows::control_window::create().unwrap();
         let _hmd_window = hmd_window::create(&state, control_window.hwnd());
         control_window.update_install_status();
