@@ -30,19 +30,20 @@ struct Vertex {
     position: [f32; 3],
 }
 
+#[allow(dead_code)]
 impl Vertex {
     fn new(x: f32, y: f32, z: f32) -> Vertex {
         Vertex {
             position: [x, y, z],
         }
     }
-    fn _x(&self) -> f32 {
+    fn x(&self) -> f32 {
         self.position[0]
     }
-    fn _y(&self) -> f32 {
+    fn y(&self) -> f32 {
         self.position[1]
     }
-    fn _z(&self) -> f32 {
+    fn z(&self) -> f32 {
         self.position[2]
     }
 }
@@ -67,7 +68,7 @@ out vec4 color;
 varying vec3 vertex_pos;
 
 float max_alt1 = 75.0f;
-float max_alt2 = 250.0f;
+float max_alt2 = 425.0f;
 vec4 sea = vec4(0.0, 0.25, 0.75, 1.0);
 vec4 beach = vec4(0.75, 0.5, 0.0, 1.0);
 vec4 grass = vec4(0.0, 0.8, 0.0, 1.0);
@@ -79,7 +80,7 @@ void main() {
     } else if (vertex_pos.y < max_alt1) {
         color = mix(beach, grass, vertex_pos.y / max_alt1);
     } else if (vertex_pos.y < max_alt2) {
-        color = mix(grass, beach, (vertex_pos.y - max_alt1) / max_alt2);
+        color = mix(grass, mountain, (vertex_pos.y - max_alt1) / max_alt2);
     } else {
         color = mountain;
     }
@@ -141,10 +142,10 @@ impl Bounds {
         }
     }
     fn update(&mut self, vertex: &Vertex) {
-        self.xmin = self.xmin.min(vertex._x());
-        self.xmax = self.xmax.max(vertex._x());
-        self.zmin = self.zmin.min(vertex._z());
-        self.zmax = self.zmax.max(vertex._z());
+        self.xmin = self.xmin.min(vertex.x());
+        self.xmax = self.xmax.max(vertex.x());
+        self.zmin = self.zmin.min(vertex.z());
+        self.zmax = self.zmax.max(vertex.z());
     }
 }
 
