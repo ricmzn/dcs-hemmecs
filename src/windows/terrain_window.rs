@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs, sync::RwLock};
+use std::{collections::HashMap, fs, path::PathBuf, sync::RwLock};
 
 use glium::{
     glutin::{
@@ -17,12 +17,12 @@ use glium::{
 };
 
 use anyhow::Result;
-use once_cell::unsync::Lazy;
 use serde::Deserialize;
 
 use crate::{
     consts::{HEIGHT, WIDTH},
     data::{dcs, FlightData},
+    installer::DCSVersion,
 };
 
 #[derive(Copy, Clone, Debug)]
@@ -55,6 +55,7 @@ const VS: &str = r"
 in vec3 position;
 uniform mat4 view_matrix;
 varying vec3 vertex_pos;
+out vec3 vertex_normal;
 
 void main() {
     vertex_pos = position;
@@ -150,24 +151,35 @@ impl Bounds {
 }
 
 fn load_tiles(display: &Display) -> Result<(Tiles, Bounds)> {
-    let files = fs::read_dir(r"C:\Users\ricmz\Saved Games\DCS\tiles")?;
-    let empty = vec![0.0, 0.0, 0.0, 0.0];
+    let files = fs::read_dir(DCSVersion::Stable.user_folder()?.join("tiles"))?;
+    let paths: Vec<PathBuf> = files
+        .flat_map(|file| file.map(|result| result.path()))
+        .collect();
+    let paths_len = paths.len().to_string();
+    let empty_tile_data = vec![0.0, 0.0, 0.0, 0.0];
     let mut vbos = Vec::new();
     let mut index_cache = HashMap::new();
     let mut bounds = Bounds::new();
-    for file in files {
-        let bytes = fs::read(file?.path())?;
+    for (i, path) in paths.iter().enumerate() {
+        let bytes = fs::read(path)?;
         let tile: Tile = rmp_serde::from_read_ref(&bytes)?;
         let tile = match &tile.data {
             Some(_) => tile,
             None => Tile {
-                data: Some(empty.clone()),
+                data: Some(empty_tile_data.clone()),
                 precision: tile.size,
                 ..tile
             },
         };
         let heights = tile.data.as_ref().unwrap();
-        print!("Processing tile ({}, {})... ", tile.x, tile.z);
+        print!(
+            "{:>width$}/{} Processing tile ({}, {})... ",
+            i,
+            paths_len,
+            tile.x,
+            tile.z,
+            width = paths_len.len()
+        );
         let rows = (tile.size / tile.precision) as u32 + 1;
         let cols = rows;
         let positions: Vec<_> = heights
@@ -198,29 +210,52 @@ fn load_tiles(display: &Display) -> Result<(Tiles, Bounds)> {
     Ok((vbos, bounds))
 }
 
-const DRAW_PARAMETERS: Lazy<DrawParameters> = Lazy::new(|| DrawParameters {
-    viewport: Some(Rect {
-        // Negative numbers in hex notation because glium's API only accepts u32...
-        bottom: 0xFFFF_FE20, // -480
-        left: 0xFFFF_FD00,   // -768
-        width: 2560,
-        height: 1440,
-    }),
-    scissor: Some(Rect {
-        bottom: 0,
-        left: 0,
-        width: 1024,
-        height: 768,
-    }),
-    ..Default::default()
-});
+/// Makes the window transparent and returns the required viewport and scissor rects for drawing in the window
+unsafe fn make_transparent(display: &Display) -> (Rect, Rect) {
+    let gl_window = display.gl_window();
+    let window = &mut *(gl_window.window() as *const _ as *mut Window);
+
+    use winapi::shared::windef::HWND;
+    use winapi::um::winuser::*;
+
+    let hwnd = window.hwnd() as HWND;
+    let screen_width = GetSystemMetrics(SM_CXSCREEN);
+    let screen_height = GetSystemMetrics(SM_CYSCREEN);
+    // increase the FOV a bit
+    let width = (WIDTH as f32 * 1.2) as i32;
+    let height = (HEIGHT as f32 * 1.2) as i32;
+    let x = screen_width / 2 - width / 2;
+    let y = screen_height / 2 - height / 2 - screen_height / 10;
+    SetWindowLongPtrA(
+        hwnd,
+        GWL_EXSTYLE,
+        (WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TRANSPARENT) as isize,
+    );
+    SetLayeredWindowAttributes(hwnd, 0, 64, LWA_ALPHA | LWA_COLORKEY);
+    SetWindowPos(hwnd, HWND_TOPMOST, x, y, width, height, 0);
+    (
+        // left & bottom = frustrum offset
+        Rect {
+            left: -x as u32,
+            bottom: -(screen_height / 2 + screen_height / 10 - height / 2) as u32,
+            width: screen_width as u32,
+            height: screen_height as u32,
+        },
+        Rect {
+            left: 0,
+            bottom: 0,
+            width: width as u32,
+            height: height as u32,
+        },
+    )
+}
 
 fn draw(
     mut frame: Frame,
     tiles: &Tiles,
     program: &Program,
     view_matrix: &glm::Mat4,
-    _cam: &glm::Vec3,
+    draw_params: &DrawParameters,
 ) {
     let uniforms = uniform! {
         view_matrix: [
@@ -233,27 +268,10 @@ fn draw(
     frame.clear_color(0.0, 0.0, 0.0, 0.0);
     for tile in tiles {
         frame
-            .draw(&tile.0, &tile.1, &program, &uniforms, &DRAW_PARAMETERS)
+            .draw(&tile.0, &tile.1, &program, &uniforms, draw_params)
             .unwrap();
     }
     frame.finish().unwrap();
-}
-
-unsafe fn make_transparent(display: &Display) {
-    let gl_window = display.gl_window();
-    let window = &mut *(gl_window.window() as *const _ as *mut Window);
-
-    use winapi::shared::windef::HWND;
-    use winapi::um::winuser::*;
-
-    let hwnd = window.hwnd() as HWND;
-    SetWindowLongPtrA(
-        hwnd,
-        GWL_EXSTYLE,
-        (WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TRANSPARENT) as isize,
-    );
-    SetLayeredWindowAttributes(hwnd, 0, 64, LWA_ALPHA | LWA_COLORKEY);
-    SetWindowPos(hwnd, HWND_TOPMOST, 768, 192, WIDTH, HEIGHT, 0);
 }
 
 pub fn create(data_handle: &RwLock<Option<FlightData>>) {
@@ -264,11 +282,17 @@ pub fn create(data_handle: &RwLock<Option<FlightData>>) {
         .with_title("Synthetic Terrain");
     let context = ContextBuilder::new().with_vsync(true);
     let mut display = Display::new(window, context, &event_loop).unwrap();
+    let (viewport, scissor) = unsafe { make_transparent(&mut display) };
     let program = Program::from_source(&display, VS, PS, None).unwrap();
-    let (tiles, bounds) = load_tiles(&display).unwrap();
 
+    let (tiles, bounds) = load_tiles(&display).unwrap();
     println!("{:#?}", bounds);
-    unsafe { make_transparent(&mut display) }
+
+    let draw_params = DrawParameters {
+        viewport: Some(viewport),
+        scissor: Some(scissor),
+        ..Default::default()
+    };
 
     // Hack the lifetime away (unsound!)
     let data_handle: &'static RwLock<Option<FlightData>> = unsafe { &*(data_handle as *const _) };
@@ -319,13 +343,7 @@ pub fn create(data_handle: &RwLock<Option<FlightData>>) {
                     &(fd.cam.p.as_glm_vec3() + fd.cam.x.as_glm_vec3() * 100.0),
                     &fd.cam.y.as_glm_vec3(),
                 );
-            draw(
-                display.draw(),
-                &tiles,
-                &program,
-                &view_matrix,
-                &fd.cam.p.as_glm_vec3(),
-            );
+            draw(display.draw(), &tiles, &program, &view_matrix, &draw_params);
         }
         _ => (),
     });
