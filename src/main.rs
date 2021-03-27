@@ -115,7 +115,6 @@ fn main() {
         let _hmd_window = hmd_window::create(&state, control_window.hwnd());
         control_window.update_install_status();
         control_window.set_config(Some(Arc::clone(&config)));
-        control_window.set_status_text("Not connected");
         run_window_loop(control_window.hwnd(), &quit_signal);
     });
 

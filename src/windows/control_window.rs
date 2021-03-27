@@ -1,8 +1,8 @@
 use anyhow::{anyhow, Context, Result};
 use nwd::NwgUi;
 use nwg::{
-    Button, CheckBox, CheckBoxState, ColorDialog, Font, Frame, GridLayout, Label, NativeUi,
-    TrackBar, Window,
+    Button, CheckBox, CheckBoxState, ColorDialog, Font, GridLayout, Label, NativeUi, TrackBar,
+    Window,
 };
 use once_cell::unsync::Lazy;
 use std::cell::{Cell, RefCell};
@@ -33,86 +33,79 @@ pub struct ControlWindow {
     #[nwg_layout(parent: window, max_row: Some(12), max_column: Some(8))]
     grid: GridLayout,
 
-    #[nwg_control]
-    #[nwg_layout_item(layout: grid, row: 0, col_span: 8)]
-    status_frame: Frame,
-
-    #[nwg_control(text: "", parent: status_frame, size: (1000, 40))]
-    status_text: Label,
-
     #[nwg_control(font: Some(&HEADING_FONT), text: "Installer")]
-    #[nwg_layout_item(layout: grid, row: 1, col_span: 8)]
+    #[nwg_layout_item(layout: grid, row: 0, col_span: 8)]
     install_title: Label,
 
     #[nwg_control(text: "DCS Stable:")]
-    #[nwg_layout_item(layout: grid, row: 2, col_span: 3)]
+    #[nwg_layout_item(layout: grid, row: 1, col_span: 3)]
     install_stable_label: Label,
 
     #[nwg_control(text: "Not Detected", enabled: false)]
     #[nwg_events(
         OnButtonClick: [ControlWindow::install_stable]
     )]
-    #[nwg_layout_item(layout: grid, row: 2, col: 3, col_span: 5)]
+    #[nwg_layout_item(layout: grid, row: 1, col: 3, col_span: 5)]
     install_stable_button: Button,
 
     #[nwg_control(text: "DCS Openbeta:")]
-    #[nwg_layout_item(layout: grid, row: 3, col_span: 3)]
+    #[nwg_layout_item(layout: grid, row: 2, col_span: 3)]
     install_openbeta_label: Label,
 
     #[nwg_control(text: "Not Found", enabled: false)]
     #[nwg_events(
         OnButtonClick: [ControlWindow::install_openbeta]
     )]
-    #[nwg_layout_item(layout: grid, row: 3, col: 3, col_span: 5)]
+    #[nwg_layout_item(layout: grid, row: 2, col: 3, col_span: 5)]
     install_openbeta_button: Button,
 
     #[nwg_control(font: Some(&HEADING_FONT), text: "Settings")]
-    #[nwg_layout_item(layout: grid, row: 4, col_span: 8)]
+    #[nwg_layout_item(layout: grid, row: 3, col_span: 8)]
     settings_title: Label,
 
     #[nwg_control(text: "Color")]
-    #[nwg_layout_item(layout: grid, row: 5, col_span: 3)]
+    #[nwg_layout_item(layout: grid, row: 4, col_span: 3)]
     color_label: Label,
 
     #[nwg_control(text: "")]
     #[nwg_events(
         OnButtonClick: [ControlWindow::on_color_button_click]
     )]
-    #[nwg_layout_item(layout: grid, row: 5, col: 3, col_span: 5)]
+    #[nwg_layout_item(layout: grid, row: 4, col: 3, col_span: 5)]
     color_button: Button,
     color_value: Cell<(u8, u8, u8)>,
 
     #[nwg_control(text: "Brightness")]
-    #[nwg_layout_item(layout: grid, row: 6, col_span: 3)]
+    #[nwg_layout_item(layout: grid, row: 5, col_span: 3)]
     brightness_label: Label,
 
     #[nwg_control(flags: "VISIBLE|HORIZONTAL")]
     #[nwg_events(
         OnHorizontalScroll: [ControlWindow::save_config]
     )]
-    #[nwg_layout_item(layout: grid, row: 6, col: 3, col_span: 5)]
+    #[nwg_layout_item(layout: grid, row: 5, col: 3, col_span: 5)]
     brightness_input: TrackBar,
 
     #[nwg_control(text: "Hide on HUD")]
-    #[nwg_layout_item(layout: grid, row: 7, col_span: 3)]
+    #[nwg_layout_item(layout: grid, row: 6, col_span: 3)]
     hide_on_hud_label: Label,
 
     #[nwg_control(text: "")]
     #[nwg_events(
         OnButtonClick: [ControlWindow::save_config]
     )]
-    #[nwg_layout_item(layout: grid, row: 7, col: 3, col_span: 5)]
+    #[nwg_layout_item(layout: grid, row: 6, col: 3, col_span: 5)]
     hide_on_hud_checkbox: CheckBox,
 
     #[nwg_control(text: "Hide in cockpit")]
-    #[nwg_layout_item(layout: grid, row: 8, col_span: 3)]
+    #[nwg_layout_item(layout: grid, row: 7, col_span: 3)]
     hide_in_cockpit_label: Label,
 
     #[nwg_control(text: "")]
     #[nwg_events(
         OnButtonClick: [ControlWindow::save_config]
     )]
-    #[nwg_layout_item(layout: grid, row: 8, col: 3, col_span: 5)]
+    #[nwg_layout_item(layout: grid, row: 7, col: 3, col_span: 5)]
     hide_in_cockpit_checkbox: CheckBox,
 
     #[nwg_control(text: "Show sample data")]
@@ -240,10 +233,6 @@ impl ControlWindow {
             self.load_config(&config.lock().unwrap());
         }
         *self.config.borrow_mut() = config;
-    }
-
-    pub fn set_status_text(&self, status: &str) {
-        self.status_text.set_text(&format!(" {}", status));
     }
 
     pub fn hwnd(&self) -> HWND {
