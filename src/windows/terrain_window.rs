@@ -13,10 +13,15 @@ use glium::{
     },
     implement_vertex,
     index::PrimitiveType,
-    uniform, Display, DrawParameters, Frame, IndexBuffer, Program, Rect, Surface, VertexBuffer,
+    texture::{RawImage2d, Texture2d},
+    uniform,
+    uniforms::{Sampler, SamplerWrapFunction},
+    Depth, DepthTest, Display, DrawParameters, Frame, IndexBuffer, Program, Rect, Surface,
+    VertexBuffer,
 };
 
 use anyhow::Result;
+use image::GenericImageView;
 use serde::Deserialize;
 
 use crate::{
@@ -53,9 +58,10 @@ implement_vertex!(Vertex, position);
 const VS: &str = r"
 #version 140
 in vec3 position;
-uniform mat4 view_matrix;
-varying vec3 vertex_pos;
 out vec3 vertex_normal;
+varying vec3 vertex_pos;
+
+uniform mat4 view_matrix;
 
 void main() {
     vertex_pos = position;
@@ -68,6 +74,9 @@ const PS: &str = r"
 out vec4 color;
 varying vec3 vertex_pos;
 
+uniform sampler2D tex;
+
+float tex_scale = 4000.0f;
 float max_alt1 = 75.0f;
 float max_alt2 = 425.0f;
 vec4 sea = vec4(0.0, 0.25, 0.75, 1.0);
@@ -85,6 +94,8 @@ void main() {
     } else {
         color = mountain;
     }
+    color = color * texture(tex, vec2(vertex_pos.x / tex_scale, vertex_pos.z / tex_scale));
+    color = clamp(color, vec4(0.01, 0.01, 0.01, 1.0), vec4(1.0));
 }
 ";
 
@@ -256,6 +267,7 @@ fn draw(
     program: &Program,
     view_matrix: &glm::Mat4,
     draw_params: &DrawParameters,
+    texture: &Texture2d,
 ) {
     let uniforms = uniform! {
         view_matrix: [
@@ -264,8 +276,11 @@ fn draw(
             [ view_matrix[(0, 2)], view_matrix[(1, 2)], view_matrix[(2, 2)], view_matrix[(3, 2)] ],
             [ view_matrix[(0, 3)], view_matrix[(1, 3)], view_matrix[(2, 3)], view_matrix[(3, 3)] ],
         ],
+        texture: Sampler::new(texture)
+            .wrap_function(SamplerWrapFunction::Repeat)
+            .anisotropy(8),
     };
-    frame.clear_color(0.0, 0.0, 0.0, 0.0);
+    frame.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.0);
     for tile in tiles {
         frame
             .draw(&tile.0, &tile.1, &program, &uniforms, draw_params)
@@ -280,7 +295,7 @@ pub fn create(data_handle: &RwLock<Option<FlightData>>) {
         .with_inner_size(PhysicalSize::new(WIDTH, HEIGHT))
         .with_decorations(false)
         .with_title("Synthetic Terrain");
-    let context = ContextBuilder::new().with_vsync(true);
+    let context = ContextBuilder::new().with_depth_buffer(24).with_vsync(true);
     let mut display = Display::new(window, context, &event_loop).unwrap();
     let (viewport, scissor) = unsafe { make_transparent(&mut display) };
     let program = Program::from_source(&display, VS, PS, None).unwrap();
@@ -291,10 +306,25 @@ pub fn create(data_handle: &RwLock<Option<FlightData>>) {
     let draw_params = DrawParameters {
         viewport: Some(viewport),
         scissor: Some(scissor),
+        depth: Depth {
+            test: DepthTest::IfLess,
+            write: true,
+            ..Default::default()
+        },
         ..Default::default()
     };
 
-    // Hack the lifetime away (unsound!)
+    let texture = {
+        let image = image::io::Reader::open("texture.png")
+            .unwrap()
+            .decode()
+            .unwrap();
+        let dimensions = image.dimensions();
+        let image = RawImage2d::from_raw_rgba_reversed(&image.into_rgba8(), dimensions);
+        Texture2d::new(&display, image).unwrap()
+    };
+
+    // Hack the data reference lifetime away (unsound!)
     let data_handle: &'static RwLock<Option<FlightData>> = unsafe { &*(data_handle as *const _) };
 
     event_loop.run(move |ev, _, control_flow| match ev {
@@ -343,7 +373,14 @@ pub fn create(data_handle: &RwLock<Option<FlightData>>) {
                     &(fd.cam.p.as_glm_vec3() + fd.cam.x.as_glm_vec3() * 100.0),
                     &fd.cam.y.as_glm_vec3(),
                 );
-            draw(display.draw(), &tiles, &program, &view_matrix, &draw_params);
+            draw(
+                display.draw(),
+                &tiles,
+                &program,
+                &view_matrix,
+                &draw_params,
+                &texture,
+            );
         }
         _ => (),
     });
