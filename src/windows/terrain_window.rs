@@ -516,7 +516,8 @@ fn draw(
     program: &Program,
     view_matrix: &glm::Mat4,
     draw_params: &DrawParameters,
-    texture: &Texture2d,
+    land_texture: &Texture2d,
+    water_texture: &Texture2d,
     cam_pos: &glm::Vec3,
 ) -> Result<()> {
     let uniforms = uniform! {
@@ -526,7 +527,10 @@ fn draw(
             [ view_matrix[(0, 2)], view_matrix[(1, 2)], view_matrix[(2, 2)], view_matrix[(3, 2)] ],
             [ view_matrix[(0, 3)], view_matrix[(1, 3)], view_matrix[(2, 3)], view_matrix[(3, 3)] ],
         ],
-        texture: Sampler::new(texture)
+        land_texture: Sampler::new(land_texture)
+            .wrap_function(SamplerWrapFunction::Repeat)
+            .anisotropy(8),
+        water_texture: Sampler::new(water_texture)
             .wrap_function(SamplerWrapFunction::Repeat)
             .anisotropy(8),
         cam: [cam_pos[0], cam_pos[1], cam_pos[2]],
@@ -544,6 +548,13 @@ fn draw(
         }
     }
     Ok(frame.finish()?)
+}
+
+fn load_texture(display: &Display, path: &str) -> Texture2d {
+    let image = image::io::Reader::open(path).unwrap().decode().unwrap();
+    let dimensions = image.dimensions();
+    let image = RawImage2d::from_raw_rgba_reversed(&image.into_rgba8(), dimensions);
+    Texture2d::new(display, image).unwrap()
 }
 
 pub fn create(data_handle: &RwLock<Option<FlightData>>) {
@@ -574,17 +585,9 @@ pub fn create(data_handle: &RwLock<Option<FlightData>>) {
         ..Default::default()
     };
 
-    let texture = {
-        let image = image::io::Reader::open("texture.png")
-            .unwrap()
-            .decode()
-            .unwrap();
-        let dimensions = image.dimensions();
-        let image = RawImage2d::from_raw_rgba_reversed(&image.into_rgba8(), dimensions);
-        Texture2d::new(&display, image).unwrap()
-    };
-
     let mut tile_map = TileMap::default();
+    let land_texture = load_texture(&display, "land.png");
+    let water_texture = load_texture(&display, "water.png");
 
     // Hack the data reference lifetime away (unsound!)
     let data_handle: &'static RwLock<Option<FlightData>> = unsafe { &*(data_handle as *const _) };
@@ -643,7 +646,8 @@ pub fn create(data_handle: &RwLock<Option<FlightData>>) {
                 &program,
                 &view_matrix,
                 &draw_params,
-                &texture,
+                &land_texture,
+                &water_texture,
                 &cam_pos,
             )
             .unwrap();
