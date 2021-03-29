@@ -30,8 +30,8 @@ use glium::{
     texture::{RawImage2d, Texture2d},
     uniform,
     uniforms::{Sampler, SamplerWrapFunction},
-    Depth, DepthTest, Display, DrawParameters, Frame, IndexBuffer, Program, Rect, Surface,
-    VertexBuffer,
+    BackfaceCullingMode, Depth, DepthTest, Display, DrawParameters, Frame, IndexBuffer, Program,
+    Rect, Surface, VertexBuffer,
 };
 
 use anyhow::{Context, Result};
@@ -589,6 +589,7 @@ pub fn create(data_handle: &RwLock<Option<FlightData>>) {
     };
 
     let draw_params = DrawParameters {
+        backface_culling: BackfaceCullingMode::CullClockwise,
         viewport: Some(viewport),
         scissor: Some(scissor),
         depth: Depth {
