@@ -34,7 +34,7 @@ use glium::{
     VertexBuffer,
 };
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use image::GenericImageView;
 use mpsc::TryRecvError;
 use serde::Deserialize;
@@ -562,11 +562,13 @@ fn draw(
     Ok(frame.finish()?)
 }
 
-fn load_texture(display: &Display, path: &str) -> Texture2d {
-    let image = image::io::Reader::open(path).unwrap().decode().unwrap();
+fn load_texture(display: &Display, path: &str) -> Result<Texture2d> {
+    let image = image::io::Reader::open(path)
+        .context(format!("Failed to load {}", path))?
+        .decode()?;
     let dimensions = image.dimensions();
     let image = RawImage2d::from_raw_rgba_reversed(&image.into_rgba8(), dimensions);
-    Texture2d::new(display, image).unwrap()
+    Ok(Texture2d::new(display, image)?)
 }
 
 pub fn create(data_handle: &RwLock<Option<FlightData>>) {
@@ -598,8 +600,8 @@ pub fn create(data_handle: &RwLock<Option<FlightData>>) {
     };
 
     let mut tile_map = TileMap::default();
-    let land_texture = load_texture(&display, "land.png");
-    let water_texture = load_texture(&display, "water.png");
+    let land_texture = load_texture(&display, "land.png").unwrap();
+    let water_texture = load_texture(&display, "water.png").unwrap();
 
     event_loop.run_return(move |ev, _, control_flow| match ev {
         Event::WindowEvent { event, .. } => match event {
