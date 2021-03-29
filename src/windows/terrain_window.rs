@@ -6,7 +6,7 @@ use std::{
     path::PathBuf,
     sync::{
         mpsc::{self, Receiver, RecvError, Sender},
-        RwLock,
+        Arc, Mutex, RwLock,
     },
     thread::{self, JoinHandle},
 };
@@ -41,6 +41,7 @@ use serde::Deserialize;
 use zip::{result::ZipError, ZipArchive};
 
 use crate::{
+    config::Config,
     consts::{HEIGHT, WIDTH},
     data::{dcs, FlightData},
     installer::DCSVersion,
@@ -483,7 +484,7 @@ impl TileMap {
 }
 
 /// Makes the window transparent and returns the required viewport and scissor rects for drawing in the window
-unsafe fn make_transparent(display: &Display) -> (Rect, Rect) {
+unsafe fn do_extra_settings(display: &Display) -> (Rect, Rect) {
     let gl_window = display.gl_window();
     let window = &mut *(gl_window.window() as *const _ as *mut Window);
 
@@ -503,7 +504,7 @@ unsafe fn make_transparent(display: &Display) -> (Rect, Rect) {
         GWL_EXSTYLE,
         (WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TRANSPARENT) as isize,
     );
-    SetLayeredWindowAttributes(hwnd, 0, 64, LWA_ALPHA | LWA_COLORKEY);
+    SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA | LWA_COLORKEY);
     SetWindowPos(hwnd, HWND_TOPMOST, x, y, width, height, 0);
     (
         // left & bottom = frustrum offset
@@ -520,6 +521,16 @@ unsafe fn make_transparent(display: &Display) -> (Rect, Rect) {
             height: height as u32,
         },
     )
+}
+
+/// Changes the fill opacity of the window
+unsafe fn set_opacity(display: &Display, opacity: u8) {
+    use winapi::shared::windef::HWND;
+    use winapi::um::winuser::*;
+    let gl_window = display.gl_window();
+    let window = &mut *(gl_window.window() as *const _ as *mut Window);
+    let hwnd = window.hwnd() as HWND;
+    SetLayeredWindowAttributes(hwnd, 0, opacity, LWA_ALPHA | LWA_COLORKEY);
 }
 
 fn draw(
@@ -571,7 +582,7 @@ fn load_texture(display: &Display, path: &str) -> Result<Texture2d> {
     Ok(Texture2d::new(display, image)?)
 }
 
-pub fn create(data_handle: &RwLock<Option<FlightData>>) {
+pub fn create(data_handle: &RwLock<Option<FlightData>>, config_handle: Arc<Mutex<Config>>) {
     let mut event_loop: EventLoop<()> = EventLoop::new_any_thread();
     let window = WindowBuilder::new()
         .with_inner_size(PhysicalSize::new(WIDTH, HEIGHT))
@@ -579,7 +590,7 @@ pub fn create(data_handle: &RwLock<Option<FlightData>>) {
         .with_title("Synthetic Terrain");
     let context = ContextBuilder::new().with_depth_buffer(24).with_vsync(true);
     let mut display = Display::new(window, context, &event_loop).unwrap();
-    let (viewport, scissor) = unsafe { make_transparent(&mut display) };
+    let (viewport, scissor) = unsafe { do_extra_settings(&mut display) };
     let program = Program::from_source(&display, VS, PS, None);
 
     let program = match program {
@@ -618,51 +629,57 @@ pub fn create(data_handle: &RwLock<Option<FlightData>>) {
             _ => (),
         },
         Event::MainEventsCleared => {
-            let fd = { data_handle.read().unwrap().clone() };
-            let fd = fd.unwrap_or_else(|| FlightData {
-                cam: dcs::Position {
-                    x: dcs::Vec3 {
-                        x: -0.60237205,
-                        y: -0.25983366,
-                        z: 0.7547415,
-                    },
-                    y: dcs::Vec3 {
-                        x: 0.07104907,
-                        y: 0.9243294,
-                        z: 0.37492293,
-                    },
-                    z: dcs::Vec3 {
-                        x: -0.79504734,
-                        y: 0.27946675,
-                        z: -0.5383293,
-                    },
-                    p: dcs::Vec3 {
-                        x: -48245.492,
-                        y: 2335.9749,
-                        z: 293213.6,
-                    },
-                },
-                ..FlightData::default()
-            });
-            let cam_pos = fd.cam.p.as_glm_vec3();
-            let cam_fwd = fd.cam.x.as_glm_vec3();
-            let cam_up = fd.cam.y.as_glm_vec3();
-            let view_matrix = glm::perspective(16.0 / 9.0, f32::to_radians(50.0), 0.5, 50_000.0)
-                * glm::look_at_rh(&cam_pos, &(cam_pos + cam_fwd * 100.0), &cam_up);
+            let brightness = config_handle.lock().unwrap().appearance.terrain_brightness;
 
-            tile_map.update(&display, &cam_pos).unwrap();
+            unsafe { set_opacity(&display, brightness) };
 
-            draw(
-                display.draw(),
-                &tile_map,
-                &program,
-                &view_matrix,
-                &draw_params,
-                &land_texture,
-                &water_texture,
-                &cam_pos,
-            )
-            .unwrap();
+            if brightness > 0 {
+                let fd = { data_handle.read().unwrap().clone() };
+                let fd = fd.unwrap_or_else(|| FlightData {
+                    cam: dcs::Position {
+                        x: dcs::Vec3 {
+                            x: -0.60237205,
+                            y: -0.25983366,
+                            z: 0.7547415,
+                        },
+                        y: dcs::Vec3 {
+                            x: 0.07104907,
+                            y: 0.9243294,
+                            z: 0.37492293,
+                        },
+                        z: dcs::Vec3 {
+                            x: -0.79504734,
+                            y: 0.27946675,
+                            z: -0.5383293,
+                        },
+                        p: dcs::Vec3 {
+                            x: -48245.492,
+                            y: 2335.9749,
+                            z: 293213.6,
+                        },
+                    },
+                    ..FlightData::default()
+                });
+                let cam_pos = fd.cam.p.as_glm_vec3();
+                let cam_fwd = fd.cam.x.as_glm_vec3();
+                let cam_up = fd.cam.y.as_glm_vec3();
+                let view_matrix =
+                    glm::perspective(16.0 / 9.0, f32::to_radians(50.0), 0.5, 50_000.0)
+                        * glm::look_at_rh(&cam_pos, &(cam_pos + cam_fwd * 100.0), &cam_up);
+
+                tile_map.update(&display, &cam_pos).unwrap();
+                draw(
+                    display.draw(),
+                    &tile_map,
+                    &program,
+                    &view_matrix,
+                    &draw_params,
+                    &land_texture,
+                    &water_texture,
+                    &cam_pos,
+                )
+                .unwrap();
+            }
         }
         _ => (),
     });

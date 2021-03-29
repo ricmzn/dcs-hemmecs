@@ -86,26 +86,37 @@ pub struct ControlWindow {
     #[nwg_layout_item(layout: grid, row: 5, col: 3, col_span: 5)]
     brightness_input: TrackBar,
 
-    #[nwg_control(text: "Hide on HUD")]
+    #[nwg_control(text: "Terrain Brt.")]
     #[nwg_layout_item(layout: grid, row: 6, col_span: 3)]
+    terrain_brightness_label: Label,
+
+    #[nwg_control(flags: "VISIBLE|HORIZONTAL")]
+    #[nwg_events(
+        OnHorizontalScroll: [ControlWindow::save_config]
+    )]
+    #[nwg_layout_item(layout: grid, row: 6, col: 3, col_span: 5)]
+    terrain_brightness_input: TrackBar,
+
+    #[nwg_control(text: "Hide on HUD")]
+    #[nwg_layout_item(layout: grid, row: 7, col_span: 3)]
     hide_on_hud_label: Label,
 
     #[nwg_control(text: "")]
     #[nwg_events(
         OnButtonClick: [ControlWindow::save_config]
     )]
-    #[nwg_layout_item(layout: grid, row: 6, col: 3, col_span: 5)]
+    #[nwg_layout_item(layout: grid, row: 7, col: 3, col_span: 5)]
     hide_on_hud_checkbox: CheckBox,
 
     #[nwg_control(text: "Hide in cockpit")]
-    #[nwg_layout_item(layout: grid, row: 7, col_span: 3)]
+    #[nwg_layout_item(layout: grid, row: 8, col_span: 3)]
     hide_in_cockpit_label: Label,
 
     #[nwg_control(text: "")]
     #[nwg_events(
         OnButtonClick: [ControlWindow::save_config]
     )]
-    #[nwg_layout_item(layout: grid, row: 7, col: 3, col_span: 5)]
+    #[nwg_layout_item(layout: grid, row: 8, col: 3, col_span: 5)]
     hide_in_cockpit_checkbox: CheckBox,
 
     #[nwg_control(text: "Show sample data")]
@@ -142,6 +153,8 @@ impl ControlWindow {
         self.update_color_button_label();
         self.brightness_input
             .set_pos((config.appearance.brightness as f64 / (255.0 / 100.0)) as usize);
+        self.terrain_brightness_input
+            .set_pos((config.appearance.terrain_brightness as f64 / (255.0 / 100.0)) as usize);
         self.hide_on_hud_checkbox
             .set_check_state(match config.occlusion.hide_on_hud {
                 true => CheckBoxState::Checked,
@@ -165,6 +178,8 @@ impl ControlWindow {
             config.appearance.color = self.color_value.get();
             config.appearance.brightness =
                 (self.brightness_input.pos() as f64 / (100.0 / 255.0)) as u8;
+            config.appearance.terrain_brightness =
+                (self.terrain_brightness_input.pos() as f64 / (100.0 / 255.0)) as u8;
             config.occlusion.hide_on_hud =
                 self.hide_on_hud_checkbox.check_state() == CheckBoxState::Checked;
             config.occlusion.hide_in_cockpit =

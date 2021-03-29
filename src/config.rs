@@ -32,6 +32,7 @@ impl Default for Occlusion {
 pub struct Appearance {
     pub color: (u8, u8, u8),
     pub brightness: u8,
+    pub terrain_brightness: u8,
 }
 
 impl Default for Appearance {
@@ -39,6 +40,7 @@ impl Default for Appearance {
         Appearance {
             color: (0, 255, 0),
             brightness: 128,
+            terrain_brightness: 64,
         }
     }
 }

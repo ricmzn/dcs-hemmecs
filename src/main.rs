@@ -114,7 +114,8 @@ fn main() {
         scope.spawn(|_| run_data_worker(data_handle, &quit_signal));
 
         // Create the terrain visualizer thread
-        scope.spawn(|_| terrain_window::create(data_handle));
+        let config_handle = Arc::clone(&state.config);
+        scope.spawn(|_| terrain_window::create(data_handle, config_handle));
 
         // Create the two main windows
         let control_window = windows::control_window::create().unwrap();
