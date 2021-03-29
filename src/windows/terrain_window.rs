@@ -1,8 +1,8 @@
 use std::{
     collections::{HashMap, HashSet},
     fmt::{self, Debug, Formatter},
-    fs,
-    io::ErrorKind,
+    fs::File,
+    io::{ErrorKind, Read},
     path::PathBuf,
     sync::{
         mpsc::{self, Receiver, Sender},
@@ -35,6 +35,7 @@ use anyhow::Result;
 use image::GenericImageView;
 use mpsc::TryRecvError;
 use serde::Deserialize;
+use zip::{result::ZipError, ZipArchive};
 
 use crate::{
     consts::{HEIGHT, WIDTH},
@@ -126,7 +127,7 @@ fn generate_indices(vertex_count: u32, rows: u32, cols: u32) -> Vec<u32> {
     indices
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Bounds {
     xmin: f32,
     xmax: f32,
@@ -165,6 +166,11 @@ impl Bounds {
             zmin: (size * z) as f32,
             zmax: (size * (z + 1)) as f32,
         }
+    }
+    fn get_or_calc(tile: &Option<GPUTile>, size: i32, x: i32, z: i32) -> Bounds {
+        tile.as_ref()
+            .map(|tile| tile.bounds.clone())
+            .unwrap_or_else(|| Bounds::for_tile(size, x, z))
     }
 }
 
@@ -248,19 +254,31 @@ struct TileRequest {
 
 struct TileMap {
     index_cache: HashMap<u32, Vec<u32>>,
-    active_tiles: HashMap<(i32, i32), GPUTile>,
+    active_tiles: HashMap<(i32, i32), Option<GPUTile>>,
     queued_tiles: HashSet<(i32, i32)>,
     total_bounds: Bounds,
 
     _w: JoinHandle<()>,
     tx: Sender<TileRequest>,
-    rx: Receiver<Tile>,
+    rx: Receiver<(TileRequest, Option<Tile>)>,
 }
 
 impl Default for TileMap {
     fn default() -> Self {
         let (tx, thread_rx) = mpsc::channel();
         let (thread_tx, rx) = mpsc::channel();
+        let get_zip: fn() -> Result<_> = || {
+            let path = DCSVersion::Stable
+                .user_folder()?
+                .join("tiles")
+                .join("caucasus.zip");
+            let file = File::open(path)?;
+            Ok(ZipArchive::new(file)?)
+        };
+        let zip = get_zip().ok();
+        if let Some(zip) = &zip {
+            println!("mounted caucasus.zip with {} files", zip.len());
+        }
         TileMap {
             index_cache: Default::default(),
             active_tiles: Default::default(),
@@ -268,7 +286,7 @@ impl Default for TileMap {
             total_bounds: Default::default(),
             _w: thread::Builder::new()
                 .name(String::from("TileMap worker"))
-                .spawn(move || TileMap::worker_func_unwrapper(thread_rx, thread_tx))
+                .spawn(move || TileMap::worker_func_unwrapper(thread_rx, thread_tx, zip))
                 .unwrap(),
             tx,
             rx,
@@ -281,25 +299,52 @@ impl TileMap {
     const STREAM_RANGE: f32 = 64_000.0;
     const TILE_SIZE: i32 = 16_000;
 
-    fn worker_func_unwrapper(rx: Receiver<TileRequest>, tx: Sender<Tile>) {
-        TileMap::worker_func(rx, tx).unwrap();
+    fn get_data<R: Read>(mut reader: R) -> Result<Tile> {
+        let mut data = Vec::new();
+        reader.read_to_end(&mut data)?;
+        Ok(rmp_serde::from_read_ref(&data)?)
     }
 
-    fn worker_func(rx: Receiver<TileRequest>, tx: Sender<Tile>) -> Result<()> {
+    fn worker_func_unwrapper(
+        rx: Receiver<TileRequest>,
+        tx: Sender<(TileRequest, Option<Tile>)>,
+        zip: Option<ZipArchive<File>>,
+    ) {
+        TileMap::worker_func(rx, tx, zip).unwrap();
+    }
+
+    fn worker_func(
+        rx: Receiver<TileRequest>,
+        tx: Sender<(TileRequest, Option<Tile>)>,
+        mut zip: Option<ZipArchive<File>>,
+    ) -> Result<()> {
+        let tile_root = PathBuf::from(DCSVersion::Stable.user_folder()?.join("tiles"));
         loop {
             let request = rx.recv()?;
-            let path = PathBuf::from(DCSVersion::Stable.user_folder()?.join("tiles").join(
-                format!("caucasus_{}_{}_{}.pack", request.size, request.x, request.z),
-            ));
-            // Load data from disk
-            let tile: Tile = match fs::read(path) {
-                Ok(bytes) => rmp_serde::from_read_ref(&bytes)?,
-                Err(e) => match e.kind() {
-                    ErrorKind::NotFound => {
-                        println!("no data available for ({}, {})", request.x, request.z);
-                        continue;
-                    }
-                    _ => Err(e)?,
+            let filename = format!("caucasus_{}_{}_{}.pack", request.size, request.x, request.z);
+            let path = tile_root.clone().join(&filename);
+            // Search in the zip first
+            let tile = match &mut zip {
+                Some(zip) => match zip.by_name(&filename) {
+                    Ok(zip) => Some(TileMap::get_data(zip)?),
+                    Err(ZipError::FileNotFound) => None,
+                    Err(e) => Err(e)?,
+                },
+                None => None,
+            };
+            // If it's not in the zip, try to find it in the folder
+            let tile = match tile {
+                Some(tile) => tile,
+                None => match File::open(path) {
+                    Ok(file) => TileMap::get_data(file)?,
+                    Err(e) => match e.kind() {
+                        ErrorKind::NotFound => {
+                            println!("no data available for ({}, {})", request.x, request.z);
+                            tx.send((request, None))?;
+                            continue;
+                        }
+                        _ => Err(e)?,
+                    },
                 },
             };
             // Fill tile with a flat surface if it contains no data
@@ -312,7 +357,7 @@ impl TileMap {
                 },
             };
             println!("loaded tile ({}, {}) from disk", tile.x, tile.z);
-            tx.send(tile)?;
+            tx.send((request, Some(tile)))?;
         }
     }
 
@@ -381,10 +426,12 @@ impl TileMap {
         // Add processed tiles from the queue
         loop {
             match self.rx.try_recv() {
-                Ok(tile) => {
-                    let new_tile = self.create_gpu_tile(&tile, &display, tile.x, tile.z)?;
-                    self.active_tiles.insert((tile.x, tile.z), new_tile);
-                    self.queued_tiles.remove(&(tile.x, tile.z));
+                Ok((request, tile)) => {
+                    let tile = tile
+                        .map(|tile| self.create_gpu_tile(&tile, &display, tile.x, tile.z))
+                        .transpose()?;
+                    self.active_tiles.insert((request.x, request.z), tile);
+                    self.queued_tiles.remove(&(request.x, request.z));
                     updated = true;
                 }
                 Err(TryRecvError::Empty) => break,
@@ -394,7 +441,9 @@ impl TileMap {
 
         // Remove tiles out of range
         self.active_tiles.retain(|&(x, z), tile| {
-            if distance_to(coords, &tile.bounds) > Self::STREAM_RANGE {
+            if distance_to(coords, &Bounds::get_or_calc(&tile, Self::TILE_SIZE, x, z))
+                > Self::STREAM_RANGE
+            {
                 println!("dropping tile ({}, {})", x, z);
                 updated = true;
                 false
@@ -406,8 +455,9 @@ impl TileMap {
         // Update the bounds
         if updated {
             self.total_bounds = Bounds::default();
-            for (_, tile) in &self.active_tiles {
-                self.total_bounds.expand(&tile.bounds);
+            for (&(x, z), tile) in &self.active_tiles {
+                self.total_bounds
+                    .expand(&Bounds::get_or_calc(&tile, Self::TILE_SIZE, x, z));
             }
             println!(
                 "total loaded tiles: {}, {:?}",
@@ -483,13 +533,15 @@ fn draw(
     };
     frame.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.0);
     for (_, tile) in &tile_map.active_tiles {
-        frame.draw(
-            &tile.vertex_buffer,
-            &tile.index_buffer,
-            &program,
-            &uniforms,
-            draw_params,
-        )?
+        if let Some(tile) = tile {
+            frame.draw(
+                &tile.vertex_buffer,
+                &tile.index_buffer,
+                &program,
+                &uniforms,
+                draw_params,
+            )?
+        }
     }
     Ok(frame.finish()?)
 }
