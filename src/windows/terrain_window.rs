@@ -5,7 +5,7 @@ use std::{
     io::{ErrorKind, Read},
     path::PathBuf,
     sync::{
-        mpsc::{self, Receiver, Sender},
+        mpsc::{self, Receiver, RecvError, Sender},
         RwLock,
     },
     thread::{self, JoinHandle},
@@ -17,7 +17,10 @@ use glium::{
         event::Event,
         event::{KeyboardInput, VirtualKeyCode, WindowEvent},
         event_loop::{ControlFlow, EventLoop},
-        platform::windows::{EventLoopExtWindows, WindowExtWindows},
+        platform::{
+            run_return::EventLoopExtRunReturn,
+            windows::{EventLoopExtWindows, WindowExtWindows},
+        },
         window::Window,
         window::WindowBuilder,
         ContextBuilder,
@@ -320,7 +323,10 @@ impl TileMap {
     ) -> Result<()> {
         let tile_root = PathBuf::from(DCSVersion::Stable.user_folder()?.join("tiles"));
         loop {
-            let request = rx.recv()?;
+            let request = match rx.recv() {
+                Ok(request) => request,
+                Err(RecvError) => break,
+            };
             let filename = format!("caucasus_{}_{}_{}.pack", request.size, request.x, request.z);
             let path = tile_root.clone().join(&filename);
             // Search in the zip first
@@ -340,8 +346,10 @@ impl TileMap {
                     Err(e) => match e.kind() {
                         ErrorKind::NotFound => {
                             println!("no data available for ({}, {})", request.x, request.z);
-                            tx.send((request, None))?;
-                            continue;
+                            match tx.send((request, None)) {
+                                Ok(_) => continue,
+                                Err(_) => break,
+                            }
                         }
                         _ => Err(e)?,
                     },
@@ -357,8 +365,12 @@ impl TileMap {
                 },
             };
             println!("loaded tile ({}, {}) from disk", tile.x, tile.z);
-            tx.send((request, Some(tile)))?;
+            if let Err(_) = tx.send((request, Some(tile))) {
+                break;
+            }
         }
+        println!("TileMap channel closed, terminating worker");
+        Ok(())
     }
 
     fn create_gpu_tile(
@@ -558,7 +570,7 @@ fn load_texture(display: &Display, path: &str) -> Texture2d {
 }
 
 pub fn create(data_handle: &RwLock<Option<FlightData>>) {
-    let event_loop: EventLoop<()> = EventLoop::new_any_thread();
+    let mut event_loop: EventLoop<()> = EventLoop::new_any_thread();
     let window = WindowBuilder::new()
         .with_inner_size(PhysicalSize::new(WIDTH, HEIGHT))
         .with_decorations(false)
@@ -589,10 +601,7 @@ pub fn create(data_handle: &RwLock<Option<FlightData>>) {
     let land_texture = load_texture(&display, "land.png");
     let water_texture = load_texture(&display, "water.png");
 
-    // Hack the data reference lifetime away (unsound!)
-    let data_handle: &'static RwLock<Option<FlightData>> = unsafe { &*(data_handle as *const _) };
-
-    event_loop.run(move |ev, _, control_flow| match ev {
+    event_loop.run_return(move |ev, _, control_flow| match ev {
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
             WindowEvent::KeyboardInput {
