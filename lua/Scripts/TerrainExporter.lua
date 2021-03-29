@@ -62,8 +62,6 @@ if Airbase == nil then
 end
 
 local tile_sz = 16000 -- tile width and length in meters
-local start = { x = -8, z = 12 } -- in tiles, starting from map origin (ie. center of crimea in caucasus)
-local tiles = { x = 10, z = 10 } -- how many tiles to create in each direction (note: +x = north, +y = east)
 local precision = 25 -- how many meters between terrain points
 assert(tile_sz % precision == 0, "tile_sz must be a multiple of precision")
 
@@ -85,6 +83,14 @@ local function array32(len)
 end
 
 local function export_tile(tile_x, tile_z, terrain)
+    local filename = terrain.."_"..tile_sz.."_"..tile_x.."_"..tile_z..".pack"
+    local filepath = lfs.writedir().."/tiles/"..filename
+    local file = io.open(filepath, "r")
+    if file ~= nil then
+        env.info("Skipping "..filename..": file already exists")
+        file:close()
+        return nil
+    end
     local rows = tile_sz / precision + 1
     local cols = rows
     local data = {}
@@ -120,8 +126,7 @@ local function export_tile(tile_x, tile_z, terrain)
             data[i] = math.floor(height - lowest)
         end
     end
-    local filename = terrain.."_"..tile_sz.."_"..tile_x.."_"..tile_z..".pack"
-    local file, err = io.open(lfs.writedir().."/tiles/"..filename, "wb")
+    local file, err = io.open(filepath, "wb")
     assert(file ~= nil, "Failed to open "..filename.." for writing: "..tostring(err))
     file:write(mp.pack({
         x = tile_x,
@@ -136,17 +141,43 @@ local function export_tile(tile_x, tile_z, terrain)
 end
 
 local export_tiles = coroutine.create(function (terrain)
+    local abort = false
+    local start = trigger.misc.getZone("start")
+    local end_ = trigger.misc.getZone("end")
+    if start == nil then
+        trigger.action.outText('Terrain export failed: must have a trigger called "start" at the bottom left corner of the map', 60, false)
+        abort = true
+    end
+    if end_ == nil then
+        trigger.action.outText('Terrain export failed: must have a trigger called "end" at the top right corner of the map', 60, false)
+        abort = true
+    end
+    if abort then
+        return false
+    end
+    local start = {
+        x = math.floor(start.point.x / tile_sz),
+        z = math.floor(start.point.z / tile_sz),
+    }
+    local end_ = {
+        x = math.ceil(end_.point.x / tile_sz),
+        z = math.ceil(end_.point.z / tile_sz),
+    }
+    assert(end_.x > start.x and end_.z > start.z, "end trigger must be northeast of start trigger")
+    env.info("Start: "..(start.x)..", "..(start.z))
+    env.info("End: "..(end_.x)..", "..(end_.z))
+    local total = (end_.x - start.x + 1) * (end_.z - start.z + 1)
     local iters = 0
-    local total = tiles.x * tiles.z
-    for x = start.x, start.x + tiles.x - 1 do
-        for z = start.z, start.z + tiles.z - 1 do
-            trigger.action.outText("Tiles processed: "..iters.."/"..total, 5, true)
+    for x = start.x, end_.x do
+        for z = start.z, end_.z - 1 do
+            trigger.action.outText("Tiles processed: "..iters.."/"..total.." ("..x..", "..z..")", 5, true)
             coroutine.yield()
-            env.info("Processing tile ("..x..", "..z..")")
             export_tile(x, z, terrain)
             iters = iters + 1
         end
     end
+    trigger.action.outText("Terrain export finished", 60, true)
+    return true
 end)
 
 -- local write_data = coroutine.create(function ()
@@ -189,9 +220,14 @@ end)
 timer.scheduleFunction(function(params, time)
     local continue, status = coroutine.resume(export_tiles, params.terrain)
     if continue then
+        if status ~= nil then
+            -- Finished gracefully
+            return nil
+        end
+        -- Still more work to do
         return time + 0.01
     else
-        trigger.action.outText("Finished processing: "..status, 60, true)
+        trigger.action.outText("Error: "..status, 60, true)
         return nil
     end
 end, { terrain = "caucasus" }, timer.getTime() + 1)
