@@ -89,6 +89,7 @@ local function export_tile(tile_x, tile_z, terrain)
     local cols = rows
     local data = {}
     local zero = true
+    local lowest = 999999
     for x = 0, rows - 1 do
         for z = 0, cols - 1 do
             local point = {
@@ -96,19 +97,28 @@ local function export_tile(tile_x, tile_z, terrain)
                 y = tile_z * tile_sz + z * precision,
             }
             local height = land.getHeight(point)
-            -- round the number to save space in the tile files by allowing msgpack to use small ints
-            -- offset by a small value to avoid rounding off-by-epsilon precision errors
+            -- round the number to 1m precision to save space (with a small offset to not turn errors in the ocean into land)
             height = math.ceil(height - 0.05)
             data[x*cols + z + 1] = height
             if zero and (height < -0.01 or height > 0.01) then
                 zero = false
             end
+            if height < lowest then
+                lowest = height
+            end
         end
     end
-    -- if the file is empty, skip writing the data (but keep the metadata)
+    -- do not write data for zero-height tiles (we can assume those are water)
     if zero then
         env.info("Skipping tile ("..tile_x..", "..tile_z.."): all points are at sea level")
+        offset = 0
         data = nil
+    end
+    -- normalize the data to the lowest point to save even more space
+    if data ~= nil then
+        for i, height in pairs(data) do
+            data[i] = math.floor(height - lowest)
+        end
     end
     local filename = terrain.."_"..tile_sz.."_"..tile_x.."_"..tile_z..".pack"
     local file, err = io.open(lfs.writedir().."/tiles/"..filename, "wb")
@@ -119,6 +129,7 @@ local function export_tile(tile_x, tile_z, terrain)
         size = tile_sz,
         precision = precision,
         terrain = terrain,
+        offset = lowest,
         data = data
     }))
     file:close()

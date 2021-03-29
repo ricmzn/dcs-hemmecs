@@ -116,6 +116,7 @@ struct Tile {
     x: i32,
     z: i32,
     size: i32,
+    offset: f32,
     precision: f32,
     terrain: String,
     data: Option<Vec<f32>>,
@@ -278,6 +279,7 @@ fn tiles_around(
     .flatten()
 }
 
+#[allow(dead_code)]
 struct TileRequest {
     x: i32,
     z: i32,
@@ -376,7 +378,7 @@ impl TileMap {
                 let i = i as i32;
                 Vertex::new(
                     (tile.x * tile.size) as f32 + (i / cols) as f32 * tile.precision,
-                    y,
+                    y + tile.offset,
                     (tile.z * tile.size) as f32 + (i % cols) as f32 * tile.precision,
                 )
             })
