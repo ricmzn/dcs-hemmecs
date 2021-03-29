@@ -67,49 +67,8 @@ impl Vertex {
 
 implement_vertex!(Vertex, position);
 
-const VS: &str = r"
-#version 140
-in vec3 position;
-out vec3 vertex_normal;
-varying vec3 vertex_pos;
-
-uniform mat4 view_matrix;
-
-void main() {
-    vertex_pos = position;
-    gl_Position = view_matrix * vec4(position, 1.0);
-}
-";
-
-const PS: &str = r"
-#version 140
-out vec4 color;
-varying vec3 vertex_pos;
-
-uniform sampler2D tex;
-
-float tex_scale = 4000.0f;
-float max_alt1 = 75.0f;
-float max_alt2 = 425.0f;
-vec4 sea = vec4(0.0, 0.25, 0.75, 1.0);
-vec4 beach = vec4(0.75, 0.5, 0.0, 1.0);
-vec4 grass = vec4(0.0, 0.8, 0.0, 1.0);
-vec4 mountain = vec4(0.8, 0.0, 0.0, 1.0);
-
-void main() {
-    if (vertex_pos.y < 0.25) {
-        color = sea;
-    } else if (vertex_pos.y < max_alt1) {
-        color = mix(beach, grass, vertex_pos.y / max_alt1);
-    } else if (vertex_pos.y < max_alt2) {
-        color = mix(grass, mountain, (vertex_pos.y - max_alt1) / max_alt2);
-    } else {
-        color = mountain;
-    }
-    color = color * texture(tex, vec2(vertex_pos.x / tex_scale, vertex_pos.z / tex_scale));
-    color = clamp(color, vec4(0.01, 0.01, 0.01, 1.0), vec4(1.0));
-}
-";
+const VS: &str = include_str!("terrain.vert");
+const PS: &str = include_str!("terrain.frag");
 
 #[derive(Clone, Deserialize)]
 struct Tile {
@@ -337,10 +296,7 @@ impl TileMap {
                 Ok(bytes) => rmp_serde::from_read_ref(&bytes)?,
                 Err(e) => match e.kind() {
                     ErrorKind::NotFound => {
-                        println!(
-                            "no data available for ({}, {})",
-                            request.x, request.z
-                        );
+                        println!("no data available for ({}, {})", request.x, request.z);
                         continue;
                     }
                     _ => Err(e)?,
@@ -511,6 +467,7 @@ fn draw(
     view_matrix: &glm::Mat4,
     draw_params: &DrawParameters,
     texture: &Texture2d,
+    cam_pos: &glm::Vec3,
 ) -> Result<()> {
     let uniforms = uniform! {
         view_matrix: [
@@ -522,6 +479,7 @@ fn draw(
         texture: Sampler::new(texture)
             .wrap_function(SamplerWrapFunction::Repeat)
             .anisotropy(8),
+        cam: [cam_pos[0], cam_pos[1], cam_pos[2]],
     };
     frame.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.0);
     for (_, tile) in &tile_map.active_tiles {
@@ -545,7 +503,13 @@ pub fn create(data_handle: &RwLock<Option<FlightData>>) {
     let context = ContextBuilder::new().with_depth_buffer(24).with_vsync(true);
     let mut display = Display::new(window, context, &event_loop).unwrap();
     let (viewport, scissor) = unsafe { make_transparent(&mut display) };
-    let program = Program::from_source(&display, VS, PS, None).unwrap();
+    let program = Program::from_source(&display, VS, PS, None);
+
+    let program = match program {
+        Ok(program) => program,
+        Err(glium::ProgramCreationError::CompilationError(msg, _)) => panic!("{}", msg),
+        e => e.unwrap(),
+    };
 
     let draw_params = DrawParameters {
         viewport: Some(viewport),
@@ -628,6 +592,7 @@ pub fn create(data_handle: &RwLock<Option<FlightData>>) {
                 &view_matrix,
                 &draw_params,
                 &texture,
+                &cam_pos,
             )
             .unwrap();
         }
