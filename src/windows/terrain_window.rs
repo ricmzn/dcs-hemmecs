@@ -438,16 +438,19 @@ impl TileMap {
     fn update(&mut self, display: &Display, coords: &glm::Vec3) -> Result<()> {
         let mut updated = false;
 
-        // Queue up tiles in range for loading
-        for (x, z) in tiles_around(coords, Self::STREAM_RANGE, Self::TILE_SIZE) {
-            if !self.active_tiles.contains_key(&(x, z)) && !self.queued_tiles.contains(&(x, z)) {
-                self.queued_tiles.insert((x, z));
-                self.tx.send(TileRequest {
-                    x,
-                    z,
-                    size: Self::TILE_SIZE,
-                    terrain: String::from("caucasus"),
-                })?;
+        // When idle, queue up tiles in range for loading
+        if self.queued_tiles.is_empty() {
+            for (x, z) in tiles_around(coords, Self::STREAM_RANGE, Self::TILE_SIZE) {
+                if !self.active_tiles.contains_key(&(x, z)) && !self.queued_tiles.contains(&(x, z))
+                {
+                    self.queued_tiles.insert((x, z));
+                    self.tx.send(TileRequest {
+                        x,
+                        z,
+                        size: Self::TILE_SIZE,
+                        terrain: String::from("caucasus"),
+                    })?;
+                }
             }
         }
 
