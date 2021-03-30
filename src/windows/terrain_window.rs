@@ -451,20 +451,19 @@ impl TileMap {
             }
         }
 
-        // Add processed tiles from the queue
-        loop {
-            match self.rx.try_recv() {
-                Ok((request, tile)) => {
-                    let tile = tile
-                        .map(|tile| TileMap::create_gpu_tile(&display, tile))
-                        .transpose()?;
-                    self.active_tiles.insert((request.x, request.z), tile);
-                    self.queued_tiles.remove(&(request.x, request.z));
-                    updated = true;
-                }
-                Err(TryRecvError::Empty) => break,
-                Err(e) => Err(e)?,
+        // Add one processed tile from the queue
+        // Note: processing is done one tile at a time to minimize stutters
+        match self.rx.try_recv() {
+            Ok((request, tile)) => {
+                let tile = tile
+                    .map(|tile| TileMap::create_gpu_tile(&display, tile))
+                    .transpose()?;
+                self.active_tiles.insert((request.x, request.z), tile);
+                self.queued_tiles.remove(&(request.x, request.z));
+                updated = true;
             }
+            Err(TryRecvError::Empty) => (),
+            Err(e) => Err(e)?,
         }
 
         // Remove tiles out of range
