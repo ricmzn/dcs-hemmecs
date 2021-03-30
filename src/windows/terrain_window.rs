@@ -256,15 +256,20 @@ struct TileRequest {
     terrain: String,
 }
 
+struct PreparedTile {
+    vertices: Vec<Vertex>,
+    indices: Vec<u32>,
+    bounds: Bounds,
+}
+
 struct TileMap {
-    index_cache: HashMap<u32, Vec<u32>>,
     active_tiles: HashMap<(i32, i32), Option<GPUTile>>,
     queued_tiles: HashSet<(i32, i32)>,
     total_bounds: Bounds,
 
     _w: JoinHandle<()>,
     tx: Sender<TileRequest>,
-    rx: Receiver<(TileRequest, Option<Tile>)>,
+    rx: Receiver<(TileRequest, Option<PreparedTile>)>,
 }
 
 impl Default for TileMap {
@@ -284,7 +289,6 @@ impl Default for TileMap {
             println!("mounted caucasus.zip with {} files", zip.len());
         }
         TileMap {
-            index_cache: Default::default(),
             active_tiles: Default::default(),
             queued_tiles: Default::default(),
             total_bounds: Default::default(),
@@ -311,17 +315,57 @@ impl TileMap {
 
     fn worker_func_unwrapper(
         rx: Receiver<TileRequest>,
-        tx: Sender<(TileRequest, Option<Tile>)>,
+        tx: Sender<(TileRequest, Option<PreparedTile>)>,
         zip: Option<ZipArchive<File>>,
     ) {
         TileMap::worker_func(rx, tx, zip).unwrap();
     }
 
+    fn prepare_gpu_tile(
+        index_cache: &mut HashMap<u32, Vec<u32>>,
+        tile: &Tile,
+    ) -> Result<PreparedTile> {
+        print!("processing tile ({}, {})... ", tile.x, tile.z);
+        let heights = tile.data.as_ref().unwrap();
+        let rows = (tile.size as f32 / tile.precision) as i32 + 1;
+        let cols = rows;
+        let vertices: Vec<_> = heights
+            .iter()
+            .enumerate()
+            .map(|(i, &y)| {
+                let i = i as i32;
+                Vertex::new(
+                    (tile.x * tile.size) as f32 + (i / cols) as f32 * tile.precision,
+                    y + tile.offset,
+                    (tile.z * tile.size) as f32 + (i % cols) as f32 * tile.precision,
+                )
+            })
+            .collect();
+
+        let indices = index_cache
+            .entry(vertices.len() as u32)
+            .or_insert_with_key(|&vertex_count| {
+                generate_indices(vertex_count, rows as u32, cols as u32)
+            })
+            .clone();
+
+        let mut bounds = Bounds::default();
+        vertices.iter().for_each(|pos| bounds.update(pos));
+
+        println!("done");
+        Ok(PreparedTile {
+            vertices,
+            indices,
+            bounds,
+        })
+    }
+
     fn worker_func(
         rx: Receiver<TileRequest>,
-        tx: Sender<(TileRequest, Option<Tile>)>,
+        tx: Sender<(TileRequest, Option<PreparedTile>)>,
         mut zip: Option<ZipArchive<File>>,
     ) -> Result<()> {
+        let mut index_cache = HashMap::new();
         let tile_root = PathBuf::from(DCSVersion::Stable.user_folder()?.join("tiles"));
         loop {
             let request = match rx.recv() {
@@ -330,6 +374,7 @@ impl TileMap {
             };
             let filename = format!("caucasus_{}_{}_{}.pack", request.size, request.x, request.z);
             let path = tile_root.clone().join(&filename);
+
             // Search in the zip first
             let tile = match &mut zip {
                 Some(zip) => match zip.by_name(&filename) {
@@ -339,6 +384,7 @@ impl TileMap {
                 },
                 None => None,
             };
+
             // If it's not in the zip, try to find it in the folder
             let tile = match tile {
                 Some(tile) => tile,
@@ -356,7 +402,8 @@ impl TileMap {
                     },
                 },
             };
-            // Fill tile with a flat surface if it contains no data
+
+            // If the tile contains no data, fill it with a flat surface
             let tile = match &tile.data {
                 Some(_) => tile,
                 None => Tile {
@@ -365,8 +412,10 @@ impl TileMap {
                     ..tile
                 },
             };
+
             println!("loaded tile ({}, {}) from disk", tile.x, tile.z);
-            if let Err(_) = tx.send((request, Some(tile))) {
+            let prepared_tile = TileMap::prepare_gpu_tile(&mut index_cache, &tile)?;
+            if let Err(_) = tx.send((request, Some(prepared_tile))) {
                 break;
             }
         }
@@ -374,49 +423,15 @@ impl TileMap {
         Ok(())
     }
 
-    fn create_gpu_tile(
-        &mut self,
-        tile: &Tile,
-        display: &Display,
-        x: i32,
-        z: i32,
-    ) -> Result<GPUTile> {
-        print!("processing tile ({}, {})... ", x, z);
-        let heights = tile.data.as_ref().unwrap();
-        let rows = (tile.size as f32 / tile.precision) as i32 + 1;
-        let cols = rows;
-        let positions: Vec<_> = heights
-            .iter()
-            .enumerate()
-            .map(|(i, &y)| {
-                let i = i as i32;
-                Vertex::new(
-                    (tile.x * tile.size) as f32 + (i / cols) as f32 * tile.precision,
-                    y + tile.offset,
-                    (tile.z * tile.size) as f32 + (i % cols) as f32 * tile.precision,
-                )
-            })
-            .collect();
-
-        let indices = self
-            .index_cache
-            .entry(heights.len() as u32)
-            .or_insert_with_key(|&vertex_count| {
-                generate_indices(vertex_count, rows as u32, cols as u32)
-            });
-
-        let mut bounds = Bounds::default();
-        positions.iter().for_each(|pos| bounds.update(pos));
-
-        print!("uploading {} triangles to GPU... ", indices.len() / 3);
-        let vbo = VertexBuffer::new(display, &positions)?;
-        let ibo = IndexBuffer::new(display, PrimitiveType::TrianglesList, &indices)?;
+    fn create_gpu_tile(display: &Display, tile: PreparedTile) -> Result<GPUTile> {
+        print!("uploading {} triangles to GPU... ", tile.indices.len() / 3);
+        let vbo = VertexBuffer::new(display, &tile.vertices)?;
+        let ibo = IndexBuffer::new(display, PrimitiveType::TrianglesList, &tile.indices)?;
         println!("done");
-
         Ok(GPUTile {
             vertex_buffer: vbo,
             index_buffer: ibo,
-            bounds: bounds,
+            bounds: tile.bounds,
         })
     }
 
@@ -441,7 +456,7 @@ impl TileMap {
             match self.rx.try_recv() {
                 Ok((request, tile)) => {
                     let tile = tile
-                        .map(|tile| self.create_gpu_tile(&tile, &display, tile.x, tile.z))
+                        .map(|tile| TileMap::create_gpu_tile(&display, tile))
                         .transpose()?;
                     self.active_tiles.insert((request.x, request.z), tile);
                     self.queued_tiles.remove(&(request.x, request.z));
