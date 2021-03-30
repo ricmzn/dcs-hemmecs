@@ -12,6 +12,7 @@ use std::{
 };
 
 use glium::{
+    draw_parameters::DepthClamp,
     glutin::{
         dpi::PhysicalSize,
         event::Event,
@@ -614,6 +615,7 @@ fn draw(
             .wrap_function(SamplerWrapFunction::Repeat)
             .anisotropy(8),
         cam: [cam_pos[0], cam_pos[1], cam_pos[2]],
+        render_distance: TileMap::STREAM_RANGE,
     };
     frame.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.0);
     for (_, tile) in &tile_map.active_tiles {
@@ -663,7 +665,8 @@ pub fn create(data_handle: &RwLock<Option<FlightData>>, config_handle: Arc<Mutex
         depth: Depth {
             test: DepthTest::IfLess,
             write: true,
-            ..Default::default()
+            range: (0.0, 1.0),
+            clamp: DepthClamp::NoClamp,
         },
         ..Default::default()
     };
@@ -721,7 +724,7 @@ pub fn create(data_handle: &RwLock<Option<FlightData>>, config_handle: Arc<Mutex
                 let cam_fwd = fd.cam.x.as_glm_vec3();
                 let cam_up = fd.cam.y.as_glm_vec3();
                 let view_matrix =
-                    glm::perspective(16.0 / 9.0, f32::to_radians(50.0), 0.5, 50_000.0)
+                    glm::infinite_perspective_rh_zo(16.0 / 9.0, f32::to_radians(50.0), 2.0)
                         * glm::look_at_rh(&cam_pos, &(cam_pos + cam_fwd * 100.0), &cam_up);
 
                 tile_map.update(&display, &cam_pos).unwrap();

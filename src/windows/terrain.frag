@@ -5,6 +5,7 @@ out vec4 color;
 
 uniform sampler2D land_texture;
 uniform sampler2D water_texture;
+uniform float render_distance;
 uniform vec3 cam;
 
 float tex_scale = 4000.0f;
@@ -20,6 +21,9 @@ vec4 sample(sampler2D tex) {
 }
 
 void main() {
+    if (distance(cam, vertex_pos) > render_distance) {
+        discard;
+    }
     if (vertex_pos.y < 0.25) {
         color = sample(water_texture) * sea;
     } else if (vertex_pos.y < max_alt1) {

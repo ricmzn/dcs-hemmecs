@@ -12,7 +12,7 @@ serde = { version = "1", features = ["derive"] }
 winapi = { version = "0.3", features = ["libloaderapi", "winuser", "errhandlingapi"] }
 regex = { version = "1", default_features = false, features = ["std", "perf-cache", "perf-dfa", "unicode-perl"] }
 raqote = { git = "https://github.com/ricmzn/raqote.git", branch = "0.8" }
-glm = { package = "nalgebra-glm", version = "0.3" }
+glm = { package = "nalgebra-glm", version = "0.11" }
 native-windows-derive = "1"
 native-windows-gui = "1"
 crossbeam = "0.8"
