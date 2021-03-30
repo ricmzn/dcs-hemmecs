@@ -208,39 +208,79 @@ fn distance_to(coords: &glm::Vec3, bounds: &Bounds) -> f32 {
     distance_2d((coords.x, coords.z), (nearest_x, nearest_z))
 }
 
+/// Generates tile positions in an outward spiral, starting from the camera, up to a specified range
 fn tiles_around(
     coords: &glm::Vec3,
     range: f32,
     tile_size: i32,
 ) -> impl Iterator<Item = (i32, i32)> {
+    let coords = coords.clone();
     let tile_size = tile_size;
-    let range_tiles = f32::ceil(range / tile_size as f32) as i32;
-    let xcenter = coords.x;
-    let zcenter = coords.z;
-    let xtile = f32::floor(xcenter / tile_size as f32) as i32;
-    let ztile = f32::floor(zcenter / tile_size as f32) as i32;
-    let mut x = xtile - range_tiles;
-    let mut z = ztile - range_tiles;
+    let range_in_tiles = f32::ceil(range / tile_size as f32) as i32;
+    let center_tile_x = f32::floor(coords.x / tile_size as f32) as i32;
+    let center_tile_z = f32::floor(coords.z / tile_size as f32) as i32;
+    let mut tile_x = center_tile_x;
+    let mut tile_z = center_tile_z;
+    let mut left_x = center_tile_x;
+    let mut right_x = center_tile_x;
+    let mut top_z = center_tile_z;
+    let mut bottom_z = center_tile_z;
     std::iter::from_fn(move || {
-        if x < xtile + range_tiles {
-            if z < ztile + range_tiles {
-                let tile;
-                if distance_to(
-                    &glm::Vec3::new(xcenter, 0.0, zcenter),
-                    &Bounds::for_tile(tile_size, x, z),
-                ) <= range
-                {
-                    tile = Some(Some((x as i32, z as i32)));
-                } else {
-                    tile = Some(None);
-                }
-                z += 1;
-                tile
+        // Check if the cursor is still within manhattan distance bounds
+        if tile_x >= center_tile_x - range_in_tiles
+            && tile_x <= center_tile_x + range_in_tiles
+            && tile_z >= center_tile_x - range_in_tiles
+            && tile_z <= center_tile_z + range_in_tiles
+        {
+            // Only include points that pass the euclidean distance check
+            let tile = if distance_to(&coords, &Bounds::for_tile(tile_size, tile_x, tile_z)) < range
+            {
+                Some((tile_x, tile_z))
             } else {
-                z = ztile - range_tiles;
-                x += 1;
-                Some(None)
+                None
+            };
+            // Spiral out clockwise, and check corners first, then straight lines
+            // ^ to >
+            if tile_x == left_x && tile_z == top_z {
+                right_x += 1;
+                tile_x += 1;
             }
+            // > to v
+            else if tile_x == right_x && tile_z == top_z {
+                bottom_z -= 1;
+                tile_z -= 1;
+            }
+            // v to <
+            else if tile_x == right_x && tile_z == bottom_z {
+                left_x -= 1;
+                tile_x -= 1;
+            }
+            // < to ^
+            else if tile_x == left_x && tile_z == bottom_z {
+                top_z += 1;
+                tile_z += 1;
+            }
+            // >
+            else if tile_x < right_x && tile_z == top_z {
+                tile_x += 1;
+            }
+            // v
+            else if tile_x == right_x && tile_z > bottom_z {
+                tile_z -= 1;
+            }
+            // <
+            else if tile_x > left_x && tile_z == bottom_z {
+                tile_x -= 1;
+            }
+            // ^
+            else if tile_x == left_x && tile_z < top_z {
+                tile_z += 1;
+            }
+            // All cases should be covered
+            else {
+                unreachable!()
+            }
+            Some(tile)
         } else {
             None
         }
