@@ -573,6 +573,7 @@ unsafe fn do_extra_settings(display: &Display) -> (Rect, Rect) {
     SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA | LWA_COLORKEY);
     SetWindowPos(hwnd, HWND_TOPMOST, x, y, width, height, 0);
     (
+        // Viewport rect
         // left & bottom = frustrum offset
         Rect {
             left: -x as u32,
@@ -580,6 +581,7 @@ unsafe fn do_extra_settings(display: &Display) -> (Rect, Rect) {
             width: screen_width as u32,
             height: screen_height as u32,
         },
+        // Scissor (clip) rect
         Rect {
             left: 0,
             bottom: 0,
@@ -600,14 +602,14 @@ unsafe fn set_opacity(display: &Display, opacity: u8) {
 }
 
 /// Check if a given tile is visible by verifying that at least one of its bounding box vertices are in the viewport
-fn is_visible(bounds: &Bounds, view_matrix: &Mat4, viewport: &Vec4) -> bool {
+fn is_visible(bounds: &Bounds, view_matrix: &Mat4, viewport: &Vec4, clip: &Rect) -> bool {
     for corner in &bounds.corners() {
         let point = glm::project_no(&corner, &glm::identity(), view_matrix, viewport.clone());
         if point.z >= 0.0
-            && point.x >= 0.0
-            && point.x <= viewport.z
-            && point.y >= 0.0
-            && point.y <= viewport.w
+            && point.x >= clip.left as f32
+            && point.x <= clip.width as f32
+            && point.y >= clip.bottom as f32
+            && point.y <= clip.height as f32
         {
             return true;
         }
@@ -626,6 +628,7 @@ fn draw(
     gradient: &Texture2d,
     cam_pos: &Vec3,
     cull_viewport: &Vec4,
+    clip: &Rect,
 ) -> Result<()> {
     let uniforms = uniform! {
         view_matrix: [
@@ -650,7 +653,7 @@ fn draw(
     for (_, tile) in &tile_map.active_tiles {
         if let Some(tile) = tile {
             total += 1;
-            if is_visible(&tile.bounds, view_matrix, cull_viewport) {
+            if is_visible(&tile.bounds, view_matrix, cull_viewport, clip) {
                 drawn += 1;
                 frame.draw(
                     &tile.vertex_buffer,
@@ -787,6 +790,7 @@ pub fn create(data_handle: &RwLock<Option<FlightData>>, config_handle: Arc<Mutex
                     &gradient,
                     &cam_pos,
                     &cull_viewport,
+                    &scissor,
                 )
                 .unwrap();
             }
