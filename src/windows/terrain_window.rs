@@ -151,6 +151,7 @@ impl Default for Bounds {
     }
 }
 
+/// TODO: upper bounds (for proper occlusion culling in the Y axis)
 impl Bounds {
     fn update(&mut self, vertex: &Vertex) {
         self.xmin = self.xmin.min(vertex.x());
@@ -176,6 +177,18 @@ impl Bounds {
         tile.as_ref()
             .map(|tile| tile.bounds.clone())
             .unwrap_or_else(|| Bounds::for_tile(size, x, z))
+    }
+    fn corners(&self) -> [glm::Vec3; 8] {
+        [
+            glm::Vec3::new(self.xmin, 0.0, self.zmin),
+            glm::Vec3::new(self.xmax, 0.0, self.zmin),
+            glm::Vec3::new(self.xmax, 0.0, self.zmax),
+            glm::Vec3::new(self.xmin, 0.0, self.zmax),
+            glm::Vec3::new(self.xmin, 32768.0, self.zmin),
+            glm::Vec3::new(self.xmax, 32768.0, self.zmin),
+            glm::Vec3::new(self.xmax, 32768.0, self.zmax),
+            glm::Vec3::new(self.xmin, 32768.0, self.zmax),
+        ]
     }
 }
 
@@ -591,6 +604,22 @@ unsafe fn set_opacity(display: &Display, opacity: u8) {
     SetLayeredWindowAttributes(hwnd, 0, opacity, LWA_ALPHA | LWA_COLORKEY);
 }
 
+/// Check if a given tile is visible by verifying that at least one of its bounding box vertices are in the viewport
+fn is_visible(bounds: &Bounds, view_matrix: &glm::Mat4, viewport: &glm::Vec4) -> bool {
+    for corner in &bounds.corners() {
+        let point = glm::project_no(&corner, &glm::identity(), view_matrix, viewport.clone());
+        if point.z >= 0.0
+            && point.x >= 0.0
+            && point.x <= viewport.z
+            && point.y >= 0.0
+            && point.y <= viewport.w
+        {
+            return true;
+        }
+    }
+    false
+}
+
 fn draw(
     mut frame: Frame,
     tile_map: &TileMap,
@@ -601,6 +630,7 @@ fn draw(
     water_texture: &Texture2d,
     gradient: &Texture2d,
     cam_pos: &glm::Vec3,
+    cull_viewport: &glm::Vec4,
 ) -> Result<()> {
     let uniforms = uniform! {
         view_matrix: [
@@ -623,13 +653,15 @@ fn draw(
     frame.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.0);
     for (_, tile) in &tile_map.active_tiles {
         if let Some(tile) = tile {
-            frame.draw(
-                &tile.vertex_buffer,
-                &tile.index_buffer,
-                &program,
-                &uniforms,
-                draw_params,
-            )?
+            if is_visible(&tile.bounds, view_matrix, cull_viewport) {
+                frame.draw(
+                    &tile.vertex_buffer,
+                    &tile.index_buffer,
+                    &program,
+                    &uniforms,
+                    draw_params,
+                )?
+            }
         }
     }
     Ok(frame.finish()?)
@@ -677,6 +709,13 @@ pub fn create(data_handle: &RwLock<Option<FlightData>>, config_handle: Arc<Mutex
         },
         ..Default::default()
     };
+
+    let cull_viewport = glm::Vec4::new(
+        viewport.left as i32 as f32,
+        viewport.bottom as i32 as f32,
+        viewport.width as i32 as f32,
+        viewport.height as i32 as f32,
+    );
 
     let mut tile_map = TileMap::default();
     let land_texture = load_texture(&display, "land.png").unwrap();
@@ -748,6 +787,7 @@ pub fn create(data_handle: &RwLock<Option<FlightData>>, config_handle: Arc<Mutex
                     &water_texture,
                     &gradient,
                     &cam_pos,
+                    &cull_viewport,
                 )
                 .unwrap();
             }
