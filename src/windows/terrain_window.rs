@@ -36,6 +36,7 @@ use glium::{
 };
 
 use anyhow::{Context, Result};
+use glm::{Mat4, Vec3, Vec4};
 use image::GenericImageView;
 use mpsc::TryRecvError;
 use serde::Deserialize;
@@ -53,7 +54,6 @@ struct Vertex {
     position: [f32; 3],
 }
 
-#[allow(dead_code)]
 impl Vertex {
     fn new(x: f32, y: f32, z: f32) -> Vertex {
         Vertex {
@@ -134,19 +134,16 @@ fn generate_indices(vertex_count: u32, rows: u32, cols: u32) -> Vec<u32> {
 
 #[derive(Debug, Clone)]
 struct Bounds {
-    xmin: f32,
-    xmax: f32,
-    zmin: f32,
-    zmax: f32,
+    min: Vec3,
+    max: Vec3,
 }
 
 impl Default for Bounds {
     fn default() -> Self {
+        use std::f32::NAN;
         Bounds {
-            xmin: f32::NAN,
-            xmax: f32::NAN,
-            zmin: f32::NAN,
-            zmax: f32::NAN,
+            min: Vec3::new(NAN, NAN, NAN),
+            max: Vec3::new(NAN, NAN, NAN),
         }
     }
 }
@@ -154,23 +151,25 @@ impl Default for Bounds {
 /// TODO: upper bounds (for proper occlusion culling in the Y axis)
 impl Bounds {
     fn update(&mut self, vertex: &Vertex) {
-        self.xmin = self.xmin.min(vertex.x());
-        self.xmax = self.xmax.max(vertex.x());
-        self.zmin = self.zmin.min(vertex.z());
-        self.zmax = self.zmax.max(vertex.z());
+        self.min.x = self.min.x.min(vertex.x());
+        self.max.x = self.max.x.max(vertex.x());
+        self.min.y = self.min.y.min(vertex.y());
+        self.max.y = self.max.y.max(vertex.y());
+        self.min.z = self.min.z.min(vertex.z());
+        self.max.z = self.max.z.max(vertex.z());
     }
     fn expand(&mut self, other: &Self) {
-        self.xmin = self.xmin.min(other.xmin);
-        self.xmax = self.xmax.max(other.xmax);
-        self.zmin = self.zmin.min(other.zmin);
-        self.zmax = self.zmax.max(other.zmax);
+        self.min.x = self.min.x.min(other.min.x);
+        self.max.x = self.max.x.max(other.max.x);
+        self.min.y = self.min.y.min(other.min.y);
+        self.max.y = self.max.y.max(other.max.y);
+        self.min.z = self.min.z.min(other.min.z);
+        self.max.z = self.max.z.max(other.max.z);
     }
     fn for_tile(size: i32, x: i32, z: i32) -> Self {
         Bounds {
-            xmin: (size * x) as f32,
-            xmax: (size * (x + 1)) as f32,
-            zmin: (size * z) as f32,
-            zmax: (size * (z + 1)) as f32,
+            min: Vec3::new((size * x) as f32, 0.0, (size * z) as f32),
+            max: Vec3::new((size * (x + 1)) as f32, 0.0, (size * (z + 1)) as f32),
         }
     }
     fn get_or_calc(tile: &Option<GPUTile>, size: i32, x: i32, z: i32) -> Bounds {
@@ -178,16 +177,16 @@ impl Bounds {
             .map(|tile| tile.bounds.clone())
             .unwrap_or_else(|| Bounds::for_tile(size, x, z))
     }
-    fn corners(&self) -> [glm::Vec3; 8] {
+    fn corners(&self) -> [Vec3; 8] {
         [
-            glm::Vec3::new(self.xmin, 0.0, self.zmin),
-            glm::Vec3::new(self.xmax, 0.0, self.zmin),
-            glm::Vec3::new(self.xmax, 0.0, self.zmax),
-            glm::Vec3::new(self.xmin, 0.0, self.zmax),
-            glm::Vec3::new(self.xmin, 32768.0, self.zmin),
-            glm::Vec3::new(self.xmax, 32768.0, self.zmin),
-            glm::Vec3::new(self.xmax, 32768.0, self.zmax),
-            glm::Vec3::new(self.xmin, 32768.0, self.zmax),
+            Vec3::new(self.min.x, self.min.y, self.min.z),
+            Vec3::new(self.min.x, self.min.y, self.max.z),
+            Vec3::new(self.min.x, self.max.y, self.min.z),
+            Vec3::new(self.min.x, self.max.y, self.max.z),
+            Vec3::new(self.max.x, self.min.y, self.min.z),
+            Vec3::new(self.max.x, self.min.y, self.max.z),
+            Vec3::new(self.max.x, self.max.y, self.min.z),
+            Vec3::new(self.max.x, self.max.y, self.max.z),
         ]
     }
 }
@@ -202,32 +201,28 @@ fn distance_2d(a: (f32, f32), b: (f32, f32)) -> f32 {
     f32::sqrt(f32::powi(f32::abs(a.0 - b.0), 2) + f32::powi(f32::abs(a.1 - b.1), 2))
 }
 
-fn distance_to(coords: &glm::Vec3, bounds: &Bounds) -> f32 {
+fn distance_to(coords: &Vec3, bounds: &Bounds) -> f32 {
     let (nearest_x, nearest_z) = (
-        if coords.x < bounds.xmin {
-            bounds.xmin
-        } else if coords.x < bounds.xmax {
-            return 0.0;
+        if coords.x < bounds.min.x {
+            bounds.min.x
+        } else if coords.x < bounds.max.x {
+            return 0.0; // inside
         } else {
-            bounds.xmax
+            bounds.max.x
         },
-        if coords.z < bounds.zmin {
-            bounds.zmin
-        } else if coords.z < bounds.zmax {
-            return 0.0;
+        if coords.z < bounds.min.z {
+            bounds.min.z
+        } else if coords.z < bounds.max.z {
+            return 0.0; // inside
         } else {
-            bounds.zmax
+            bounds.max.z
         },
     );
     distance_2d((coords.x, coords.z), (nearest_x, nearest_z))
 }
 
 /// Generates tile positions in an outward spiral, starting from the camera, up to a specified range
-fn tiles_around(
-    coords: &glm::Vec3,
-    range: f32,
-    tile_size: i32,
-) -> impl Iterator<Item = (i32, i32)> {
+fn tiles_around(coords: &Vec3, range: f32, tile_size: i32) -> impl Iterator<Item = (i32, i32)> {
     let coords = coords.clone();
     let tile_size = tile_size;
     let range_in_tiles = f32::ceil(range / tile_size as f32) as i32;
@@ -489,7 +484,7 @@ impl TileMap {
         })
     }
 
-    fn update(&mut self, display: &Display, coords: &glm::Vec3) -> Result<()> {
+    fn update(&mut self, display: &Display, coords: &Vec3) -> Result<()> {
         let mut updated = false;
 
         // When idle, queue up tiles in range for loading
@@ -605,7 +600,7 @@ unsafe fn set_opacity(display: &Display, opacity: u8) {
 }
 
 /// Check if a given tile is visible by verifying that at least one of its bounding box vertices are in the viewport
-fn is_visible(bounds: &Bounds, view_matrix: &glm::Mat4, viewport: &glm::Vec4) -> bool {
+fn is_visible(bounds: &Bounds, view_matrix: &Mat4, viewport: &Vec4) -> bool {
     for corner in &bounds.corners() {
         let point = glm::project_no(&corner, &glm::identity(), view_matrix, viewport.clone());
         if point.z >= 0.0
@@ -624,13 +619,13 @@ fn draw(
     mut frame: Frame,
     tile_map: &TileMap,
     program: &Program,
-    view_matrix: &glm::Mat4,
+    view_matrix: &Mat4,
     draw_params: &DrawParameters,
     land_texture: &Texture2d,
     water_texture: &Texture2d,
     gradient: &Texture2d,
-    cam_pos: &glm::Vec3,
-    cull_viewport: &glm::Vec4,
+    cam_pos: &Vec3,
+    cull_viewport: &Vec4,
 ) -> Result<()> {
     let uniforms = uniform! {
         view_matrix: [
@@ -651,9 +646,12 @@ fn draw(
         render_distance: TileMap::STREAM_RANGE,
     };
     frame.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.0);
+    let (mut total, mut drawn) = (0, 0);
     for (_, tile) in &tile_map.active_tiles {
         if let Some(tile) = tile {
+            total += 1;
             if is_visible(&tile.bounds, view_matrix, cull_viewport) {
+                drawn += 1;
                 frame.draw(
                     &tile.vertex_buffer,
                     &tile.index_buffer,
@@ -664,6 +662,7 @@ fn draw(
             }
         }
     }
+    println!("Drawn/Total: {}/{}", drawn, total);
     Ok(frame.finish()?)
 }
 
@@ -710,7 +709,7 @@ pub fn create(data_handle: &RwLock<Option<FlightData>>, config_handle: Arc<Mutex
         ..Default::default()
     };
 
-    let cull_viewport = glm::Vec4::new(
+    let cull_viewport = Vec4::new(
         viewport.left as i32 as f32,
         viewport.bottom as i32 as f32,
         viewport.width as i32 as f32,
