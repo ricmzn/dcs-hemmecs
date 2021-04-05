@@ -1,3 +1,4 @@
-/target
-/dist
 dcs-hemmecs.toml*
+target
+dist
+.vs
