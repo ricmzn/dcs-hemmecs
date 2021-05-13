@@ -23,8 +23,8 @@ impl ToDegrees for (f32, f32, f32) {
 pub mod dcs {
     use super::*;
 
-    #[serde(default)]
     #[derive(Debug, Clone, Default, Deserialize)]
+    #[serde(default)]
     pub struct Vec3 {
         pub x: f32,
         pub y: f32,
@@ -47,8 +47,8 @@ pub mod dcs {
         }
     }
 
-    #[serde(default)]
     #[derive(Debug, Clone, Default, Deserialize)]
+    #[serde(default)]
     pub struct Position {
         /// Orientation x-vector
         pub x: Vec3,
@@ -75,15 +75,15 @@ pub mod dcs {
         }
     }
 
-    #[serde(default)]
     #[derive(Debug, Clone, Default, Deserialize)]
+    #[serde(default)]
     pub struct EngineDetails {
         pub left: f32,
         pub right: f32,
     }
 
-    #[serde(default)]
     #[derive(Debug, Clone, Default, Deserialize)]
+    #[serde(default)]
     #[allow(non_snake_case)]
     pub struct EngineData {
         pub RPM: EngineDetails,
@@ -97,15 +97,15 @@ pub mod dcs {
         }
     }
 
-    #[serde(default)]
     #[derive(Debug, Clone, Default, Deserialize)]
+    #[serde(default)]
     pub struct WeaponDetails {
         pub name: String,
         pub count: i32,
     }
 
-    #[serde(default)]
     #[derive(Debug, Clone, Default, Deserialize)]
+    #[serde(default)]
     pub struct WeaponData {
         pub current: Option<WeaponDetails>,
         pub shells: i32,
@@ -122,8 +122,8 @@ pub enum UnitSystem {
     Imperial,
 }
 
-#[serde(default)]
 #[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
 pub struct FlightData {
     pub cp_params: Option<String>,
     pub time: f32,
