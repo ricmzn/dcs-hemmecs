@@ -5,7 +5,7 @@ use std::{
     io::{self, Error, ErrorKind, Read, Seek, SeekFrom, Write},
     ops::Range,
     os::windows::ffi::OsStringExt,
-    path::PathBuf,
+    path::{Path, PathBuf},
     ptr::null_mut,
     slice,
 };
@@ -104,7 +104,7 @@ pub fn rewrite_export_lua_snippet(file: &mut File, reinstall: bool) -> Result<()
     }
 
     // Also be nice and put a line break at the end
-    export_lua_text.push_str("\n");
+    export_lua_text.push('\n');
 
     // Write the changes
     file.seek(SeekFrom::Start(0))?;
@@ -120,7 +120,7 @@ pub fn rewrite_export_lua_snippet(file: &mut File, reinstall: bool) -> Result<()
 }
 
 /// Open a file for reading and writing, creating it if it does not exist
-pub fn open_rw(path: &PathBuf) -> Result<File> {
+pub fn open_rw(path: &Path) -> Result<File> {
     OpenOptions::new()
         .read(true)
         .write(true)

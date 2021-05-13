@@ -4,14 +4,14 @@ use nwg::{
     Button, CheckBox, CheckBoxState, ColorDialog, Font, GridLayout, Label, NativeUi, TrackBar,
     Window,
 };
-use once_cell::unsync::Lazy;
+use once_cell::sync::Lazy;
 use std::cell::{Cell, RefCell};
 use winapi::shared::windef::HWND;
 
 use crate::config::{self, Config, ConfigHandle};
 use crate::installer::{self, DCSVersion, InstallStatus};
 
-const HEADING_FONT: Lazy<Font> = Lazy::new(|| {
+static HEADING_FONT: Lazy<Font> = Lazy::new(|| {
     let mut font = Default::default();
     Font::builder()
         .family("Segoe UI")
@@ -245,5 +245,5 @@ pub use control_window_ui::ControlWindowUi;
 pub fn create() -> Result<ControlWindowUi> {
     nwg::init().context("failed to initialize Native Widnows GUI")?;
     nwg::Font::set_global_family("Segoe UI").context("failed to set default font")?;
-    Ok(ControlWindow::build_ui(Default::default()).context("failed to build UI")?)
+    ControlWindow::build_ui(Default::default()).context("failed to build UI")
 }

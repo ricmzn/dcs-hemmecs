@@ -183,16 +183,16 @@ impl FlightData {
             // DCS undocumented cockpit param format
             // Each parameter is separated by a line break,
             // and is presented in the format Key:Value
-            for param in params_raw.split("\n") {
-                let mut key_value = param.split(":");
+            for param in params_raw.split('\n') {
+                let mut key_value = param.split(':');
                 if let Some(key) = key_value.next() {
                     if let Some(value) = key_value.next() {
                         match key {
                             "EJECTION_INITIATED_0" => {
                                 // (Undocumented) values:
-                                // -1: not ejected
-                                // >1: ejecting
-                                // 0: pilot absent or dead
+                                // -1: not ejected yet
+                                // (0, 1): ejection in progress
+                                // 0: ejection finished or pilot dead
                                 params.ejected = value.parse::<f32>().unwrap_or(-1.0) >= 0.0;
                             }
                             _ => (),

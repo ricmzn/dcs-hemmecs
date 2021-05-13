@@ -68,11 +68,11 @@ pub fn load_or_create_config() -> Result<Config> {
             let config = toml::from_slice(&buf)?;
 
             // Try to write any newly created config entries back to the file
+            let buf = toml::to_vec(&config)?;
             let tmp_filename = format!("{}.tmp", CONFIG_FILE);
             let mut tmp_file = File::create(&tmp_filename)?;
-            let mut buf = toml::to_vec(&config)?;
             tmp_file
-                .write_all(&mut buf)
+                .write_all(&buf)
                 .context("failed to write new config entries to file")?;
 
             drop(tmp_file);
@@ -103,12 +103,12 @@ pub fn load_or_create_config() -> Result<Config> {
 }
 
 pub fn save_config(config: &Config) -> Result<()> {
+    let buf = toml::to_vec(&config)?;
     let tmp_filename = format!("{}.tmp", CONFIG_FILE);
     let mut tmp_file = File::create(&tmp_filename)?;
-    let mut buf = toml::to_vec(&config)?;
 
     tmp_file
-        .write_all(&mut buf)
+        .write_all(&buf)
         .context("failed to write new config entries to file")?;
 
     drop(tmp_file);

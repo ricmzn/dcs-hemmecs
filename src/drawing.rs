@@ -1,5 +1,5 @@
 use font_kit::font::Font;
-use once_cell::unsync::Lazy;
+use once_cell::sync::Lazy;
 use raqote::{DrawTarget, PathBuilder, Point, Source, StrokeStyle};
 use regex::Regex;
 use winapi::shared::windef::HWND;
@@ -14,7 +14,7 @@ use crate::{
     windows::is_focused,
 };
 
-const WEAPON_CODE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?:\w+[-.])?(\w+)(?:\s.+)?").unwrap());
+static WEAPON_CODE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?:\w+[-.])?(\w+)(?:\s.+)?").unwrap());
 
 /// Formats a line as left and right aligned columns of text
 fn two_columns(left: &str, right: &str) -> String {
@@ -122,7 +122,7 @@ fn render_data(data: &FlightData) -> String {
                     UnitSystem::Metric => format!("{:.0} kg", engine_data.total_fuel()),
                     // kg -> lb
                     UnitSystem::Imperial => {
-                        format!("{:.0} lbs", engine_data.total_fuel() * 2.204622622)
+                        format!("{:.0} lbs", engine_data.total_fuel() * 2.2046225)
                     }
                 };
                 two_columns(&aoa_str, &fuel_str)

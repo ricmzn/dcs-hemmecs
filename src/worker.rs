@@ -39,9 +39,8 @@ pub fn run_data_worker(data_handle: &RwLock<Option<FlightData>>, quit_signal: &A
                 // Connected to DCS
                 Ok(stream) => {
                     println!("Connected to DCS");
-                    match handle_data_connection(stream, data_handle, quit_signal) {
-                        Err(_) => println!("Warning: DCS disconnected suddenly"),
-                        _ => (),
+                    if let Err(_) = handle_data_connection(stream, data_handle, quit_signal) {
+                        println!("Warning: DCS disconnected suddenly");
                     }
                 }
                 // DCS closed connection

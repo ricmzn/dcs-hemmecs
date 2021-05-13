@@ -39,16 +39,14 @@ impl DCSVersion {
                     .join(constants::HEMMECS_EXPORT_SCRIPT_PATH);
                 if !Path::exists(&export_script_path) {
                     Ok(InstallStatus::NotInstalled)
+                } else if File::open(export_script_path)?
+                    .bytes()
+                    .map(Result::unwrap)
+                    .eq(constants::HEMMECS_EXPORT_SCRIPT.bytes())
+                {
+                    Ok(InstallStatus::Installed)
                 } else {
-                    if File::open(export_script_path)?
-                        .bytes()
-                        .map(Result::unwrap)
-                        .eq(constants::HEMMECS_EXPORT_SCRIPT.bytes())
-                    {
-                        Ok(InstallStatus::Installed)
-                    } else {
-                        Ok(InstallStatus::RequiresUpdate)
-                    }
+                    Ok(InstallStatus::RequiresUpdate)
                 }
             }
         }
