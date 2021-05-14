@@ -166,6 +166,31 @@ pub fn draw<'a>(
         let cockpit_params = data.parse_cockpit_params().unwrap_or_default();
         let camera_angles = data.camera_angles();
 
+        // Radar targets
+        for target in &data.targets {
+            let point_size = 24.0;
+            let position = target.position.p.project(screen_dimensions, &data.cam);
+            let dist = (target.distance / 1852.0).round().to_string();
+            if let Some((x, y)) = position {
+                draw_target.draw_text(
+                    default_font,
+                    point_size,
+                    "<   >",
+                    Point::new(x - point_size * (3.0 / 4.0), y + point_size * (2.0 / 4.0)),
+                    &color,
+                    &DRAW_OPTIONS,
+                );
+                draw_target.draw_text(
+                    default_font,
+                    point_size,
+                    &dist,
+                    Point::new(x - point_size * (1.0 / 4.0), y + point_size * (4.0 / 4.0)),
+                    &color,
+                    &DRAW_OPTIONS,
+                );
+            }
+        }
+
         let text = if cockpit_params.ejected {
             String::from("YEET")
         } else if FlightData::is_occluded(camera_angles, &config) {

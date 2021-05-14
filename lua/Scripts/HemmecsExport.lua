@@ -65,6 +65,7 @@ local function exportData()
         g = LoGetAccelerationUnits(),
         cam = LoGetCameraPosition(),
         engine_data = LoGetEngineInfo(),
+        targets = LoGetTargetInformation(),
         unit = player.Name,
         weapons = weapons
     })

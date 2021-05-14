@@ -8,7 +8,7 @@ pub const TEXT_OFFSET_Y: f32 = FONT_SIZE * 5.0 / 6.0;
 pub const TEXT_COLUMNS: i32 = (HUD_WIDTH as f32 / (FONT_SIZE / 2.0)) as i32;
 pub static DEFAULT_FONT: &[u8] = include_bytes!("../fonts/Inconsolata-SemiBold.ttf");
 
-pub const DRAW_OPTIONS: DrawOptions = DrawOptions {
+pub static DRAW_OPTIONS: DrawOptions = DrawOptions {
     antialias: AntialiasMode::None,
     blend_mode: BlendMode::Src,
     alpha: 1.0,

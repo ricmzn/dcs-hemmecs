@@ -35,6 +35,34 @@ pub mod dcs {
         pub fn as_glm_vec3(&self) -> glm::Vec3 {
             glm::Vec3::new(self.x, self.y, self.z)
         }
+        pub fn project(
+            &self,
+            screen_dimensions: (i32, i32),
+            camera: &Position,
+        ) -> Option<(f32, f32)> {
+            let cam_pos = camera.p.as_glm_vec3();
+            let cam_fwd = camera.x.as_glm_vec3();
+            let cam_up = camera.y.as_glm_vec3();
+            // Assume standard FC3 FOV at exactly 50% zoom and a 16:9 aspect ratio
+            let projection = glm::perspective(16.0 / 9.0, f32::to_radians(50.0), 1.0, 10000.0)
+                * glm::look_at(&cam_pos, &(cam_pos + cam_fwd * 100.0), &cam_up);
+            let projected = glm::project(
+                &self.as_glm_vec3(),
+                &glm::identity(),
+                &projection,
+                glm::Vec4::new(
+                    0.0,
+                    0.0,
+                    screen_dimensions.0 as f32,
+                    screen_dimensions.1 as f32,
+                ),
+            );
+            if projected.z >= 0.0 {
+                Some((projected.x, screen_dimensions.1 as f32 - projected.y))
+            } else {
+                None
+            }
+        }
     }
 
     impl From<glm::Vec3> for Vec3 {
@@ -84,9 +112,9 @@ pub mod dcs {
 
     #[derive(Debug, Clone, Default, Deserialize)]
     #[serde(default)]
-    #[allow(non_snake_case)]
     pub struct EngineData {
-        pub RPM: EngineDetails,
+        #[serde(rename = "RPM")]
+        pub rpm: EngineDetails,
         pub fuel_internal: f32,
         pub fuel_external: f32,
     }
@@ -109,6 +137,15 @@ pub mod dcs {
     pub struct WeaponData {
         pub current: Option<WeaponDetails>,
         pub shells: i32,
+    }
+
+    #[derive(Debug, Clone, Default, Deserialize)]
+    #[serde(default)]
+    pub struct Target {
+        #[serde(rename = "ID")]
+        pub id: i32,
+        pub position: Position,
+        pub distance: f32,
     }
 }
 
@@ -139,6 +176,7 @@ pub struct FlightData {
     pub cam: dcs::Position,
     pub engine_data: Option<dcs::EngineData>,
     pub weapons: Option<dcs::WeaponData>,
+    pub targets: Vec<dcs::Target>,
     pub unit: String,
 }
 
