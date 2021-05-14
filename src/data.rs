@@ -248,4 +248,5 @@ pub struct ApplicationState {
     pub draw_target: RefCell<DrawTarget>,
     pub font: RefCell<Font>,
     pub config: ConfigHandle,
+    pub screen_dimensions: (i32, i32),
 }

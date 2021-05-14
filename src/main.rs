@@ -21,7 +21,7 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use config::Config;
 use config::{load_or_create_config, ConfigHandle};
-use consts::{DEFAULT_FONT, HEIGHT, WIDTH};
+use consts::DEFAULT_FONT;
 use data::ApplicationState;
 use windows::{hmd_window, run_window_loop, show_message_box, MessageBoxType};
 use worker::run_data_worker;
@@ -88,10 +88,16 @@ fn main() {
             Config::default()
         }
         Err(err) => {
-            eprintln!("Internal error while loading/creating config file: {:?}", err);
+            eprintln!(
+                "Internal error while loading/creating config file: {:?}",
+                err
+            );
             Config::default()
         }
     };
+
+    let screen_dimensions = windows::get_screen_dimensions();
+    println!("Main display size: {:?}", screen_dimensions);
 
     // Put the config in an Arc<Mutex<T>> for sharing between threads
     let config: ConfigHandle = Arc::new(Mutex::new(config));
@@ -99,9 +105,10 @@ fn main() {
     // Pin the data to make sure the pointer we use later (in window_proc) can't point to a dropped value
     let state = Box::pin(ApplicationState {
         flight_data: RwLock::new(None),
-        draw_target: RefCell::new(DrawTarget::new(WIDTH, HEIGHT)),
+        draw_target: RefCell::new(DrawTarget::new(screen_dimensions.0, screen_dimensions.1)),
         font: RefCell::new(default_font),
         config: Arc::clone(&config),
+        screen_dimensions,
     });
 
     // Use crossbeam's thread scope feature to keep lifetimes tidy as the worker threads don't need to run beyond the main thread

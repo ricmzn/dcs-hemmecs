@@ -7,8 +7,8 @@ use winapi::shared::windef::HWND;
 use crate::{
     config::Config,
     consts::{
-        background, red, rgb, DRAW_OPTIONS, FONT_SIZE, HEIGHT, TEXT_COLUMNS, TEXT_OFFSET_X,
-        TEXT_OFFSET_Y, WIDTH,
+        background, red, rgb, DRAW_OPTIONS, FONT_SIZE, HUD_HEIGHT, HUD_WIDTH, TEXT_COLUMNS,
+        TEXT_OFFSET_X, TEXT_OFFSET_Y,
     },
     data::{FlightData, UnitSystem},
     windows::is_focused,
@@ -27,7 +27,13 @@ fn two_columns(left: &str, right: &str) -> String {
 }
 
 /// Draws text with the default font size
-fn draw_text(draw_target: &mut DrawTarget, font: &Font, color: &Source, text: &str) {
+fn draw_text(
+    draw_target: &mut DrawTarget,
+    font: &Font,
+    color: &Source,
+    text: &str,
+    offsets: (f32, f32),
+) {
     let char_ids = text
         .chars()
         .map(|c| font.glyph_for_char(c).unwrap_or_default())
@@ -37,12 +43,12 @@ fn draw_text(draw_target: &mut DrawTarget, font: &Font, color: &Source, text: &s
         .chars()
         .map({
             // Init
-            let mut x = TEXT_OFFSET_X;
-            let mut y = TEXT_OFFSET_Y;
+            let mut x = TEXT_OFFSET_X + offsets.0;
+            let mut y = TEXT_OFFSET_Y + offsets.1;
             // Loop
             move |c| {
                 if c == '\n' {
-                    x = FONT_SIZE / 6.0;
+                    x = TEXT_OFFSET_X + offsets.0;
                     y += FONT_SIZE;
                 } else {
                     x += FONT_SIZE / 2.0;
@@ -139,15 +145,23 @@ pub fn draw<'a>(
     config: &Config,
     data: &Option<FlightData>,
     draw_target: &'a mut DrawTarget,
+    screen_dimensions: (i32, i32),
     default_font: &Font,
 ) -> &'a [u32] {
     draw_target.clear(background());
 
+    // Nicely place the HUD area of the HMD in the center and a little bit high
+    let offsets = (
+        screen_dimensions.0 as f32 / 2.0 - HUD_WIDTH as f32 / 2.0,
+        screen_dimensions.1 as f32 / 2.0
+            - HUD_HEIGHT as f32 / 2.0
+            - screen_dimensions.1 as f32 / 10.0,
+    );
     let color = rgb(config.appearance.color);
 
     if config.show_sample_data {
         let sample_data = render_data(&FlightData::sample());
-        draw_text(draw_target, &default_font, &color, &sample_data);
+        draw_text(draw_target, &default_font, &color, &sample_data, offsets);
     } else if let Some(data) = data {
         let cockpit_params = data.parse_cockpit_params().unwrap_or_default();
         let camera_angles = data.camera_angles();
@@ -160,15 +174,15 @@ pub fn draw<'a>(
             render_data(&data)
         };
 
-        draw_text(draw_target, &default_font, &color, &text);
+        draw_text(draw_target, &default_font, &color, &text, offsets);
     } else {
-        draw_text(draw_target, &default_font, &color, "Not Connected");
+        draw_text(draw_target, &default_font, &color, "Not Connected", offsets);
     }
 
     // Paint window border in case it's in focus
     if is_focused(hwnd) {
         let mut pb = PathBuilder::new();
-        pb.rect(0.0, 0.0, WIDTH as f32, HEIGHT as f32);
+        pb.rect(0.0, 0.0, HUD_WIDTH as f32, HUD_HEIGHT as f32);
         draw_target.stroke(
             &pb.finish(),
             &red(),

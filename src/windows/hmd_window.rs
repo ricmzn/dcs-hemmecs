@@ -7,7 +7,6 @@ use winapi::um::libloaderapi::*;
 use winapi::um::wingdi::*;
 use winapi::um::winuser::*;
 
-use crate::consts::{HEIGHT, WIDTH};
 use crate::drawing::draw;
 use crate::ApplicationState;
 
@@ -22,8 +21,8 @@ const BMP_INFO: BITMAPINFO = BITMAPINFO {
     }],
     bmiHeader: BITMAPINFOHEADER {
         biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
-        biWidth: WIDTH,
-        biHeight: -HEIGHT,
+        biWidth: -1,  // placeholder
+        biHeight: -1, // placeholder
         biPlanes: 1,
         biBitCount: 32,
         biCompression: BI_RGB,
@@ -53,22 +52,35 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
                 let mut draw_target = data.draw_target.borrow_mut();
                 let flight_data = { data.flight_data.read().unwrap().clone() };
                 let config = { data.config.lock().unwrap().clone() };
+                let (width, height) = data.screen_dimensions;
                 let font = data.font.borrow();
+
+                // Set the image blit size
+                // Note: the height is reversed because Raqote and Windows start at opposite points in the Y axis
+                let mut bmp_info = BMP_INFO;
+                bmp_info.bmiHeader.biWidth = width;
+                bmp_info.bmiHeader.biHeight = -height;
 
                 // Copy image data to window
                 StretchDIBits(
                     hdc,
                     0,
                     0,
-                    WIDTH,
-                    HEIGHT,
+                    width,
+                    height,
                     0,
                     0,
-                    WIDTH,
-                    HEIGHT,
-                    draw(hwnd, &config, &flight_data, &mut draw_target, &font) as *const [u32]
-                        as *mut _,
-                    &BMP_INFO as *const BITMAPINFO,
+                    width,
+                    height,
+                    draw(
+                        hwnd,
+                        &config,
+                        &flight_data,
+                        &mut draw_target,
+                        data.screen_dimensions,
+                        &font,
+                    ) as *const [u32] as *mut _,
+                    &bmp_info,
                     DIB_RGB_COLORS,
                     SRCCOPY,
                 );
@@ -119,10 +131,9 @@ pub fn create(window_data: &Pin<Box<ApplicationState>>, parent: HWND) -> HWND {
         style: CS_HREDRAW | CS_VREDRAW,
     };
 
-    unsafe {
-        let screen_width = GetSystemMetrics(SM_CXSCREEN);
-        let screen_height = GetSystemMetrics(SM_CYSCREEN);
+    let (screen_width, screen_height) = window_data.screen_dimensions;
 
+    unsafe {
         RegisterClassA(&window_class);
 
         let hwnd = CreateWindowExA(
@@ -130,10 +141,10 @@ pub fn create(window_data: &Pin<Box<ApplicationState>>, parent: HWND) -> HWND {
             class_name.as_ptr(),
             title.as_ptr(),
             WS_VISIBLE | WS_CHILD | WS_POPUP,
-            screen_width / 2 - WIDTH / 2,
-            screen_height / 2 - HEIGHT / 2 - screen_height / 10,
-            WIDTH,
-            HEIGHT,
+            0,
+            0,
+            screen_width,
+            screen_height,
             parent as *const _ as *mut _,
             NULL(),
             instance,

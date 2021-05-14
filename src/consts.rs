@@ -1,11 +1,11 @@
 use raqote::{AntialiasMode, BlendMode, Color, DrawOptions, SolidSource, Source};
 
-pub const WIDTH: i32 = 1024;
-pub const HEIGHT: i32 = 768;
+pub const HUD_WIDTH: i32 = 1024;
+pub const HUD_HEIGHT: i32 = 768;
 pub const FONT_SIZE: f32 = 48.0;
 pub const TEXT_OFFSET_X: f32 = -FONT_SIZE / 3.0;
 pub const TEXT_OFFSET_Y: f32 = FONT_SIZE * 5.0 / 6.0;
-pub const TEXT_COLUMNS: i32 = (WIDTH as f32 / (FONT_SIZE / 2.0)) as i32;
+pub const TEXT_COLUMNS: i32 = (HUD_WIDTH as f32 / (FONT_SIZE / 2.0)) as i32;
 pub static DEFAULT_FONT: &[u8] = include_bytes!("../fonts/Inconsolata-SemiBold.ttf");
 
 pub const DRAW_OPTIONS: DrawOptions = DrawOptions {
