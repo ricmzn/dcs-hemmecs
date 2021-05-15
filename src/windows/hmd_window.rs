@@ -73,7 +73,6 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
                     width,
                     height,
                     draw(
-                        hwnd,
                         &config,
                         &flight_data,
                         &mut draw_target,

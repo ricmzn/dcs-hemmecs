@@ -1,16 +1,16 @@
 use font_kit::font::Font;
 use once_cell::sync::Lazy;
-use raqote::{DrawTarget, PathBuilder, Point, Source, StrokeStyle};
+use raqote::{DrawTarget, Point, Source};
 use regex::Regex;
-use winapi::shared::windef::HWND;
 
 use crate::{
     config::Config,
     consts::{
-        background, red, rgb, DRAW_OPTIONS, FONT_SIZE, HUD_HEIGHT, HUD_WIDTH, TEXT_COLUMNS,
-        TEXT_OFFSET_X, TEXT_OFFSET_Y,
+        background, rgb, FONT_SIZE, HUD_HEIGHT, HUD_WIDTH, NO_AA, TEXT_COLUMNS, TEXT_OFFSET_X,
+        TEXT_OFFSET_Y,
     },
     data::{FlightData, UnitSystem},
+    symbols::{self},
 };
 
 static WEAPON_CODE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?:\w+[-.])?(\w+)(?:\s.+)?").unwrap());
@@ -57,14 +57,7 @@ fn draw_text(
         })
         .collect::<Vec<_>>();
 
-    draw_target.draw_glyphs(
-        &font,
-        FONT_SIZE,
-        &char_ids,
-        &char_positions,
-        color,
-        &DRAW_OPTIONS,
-    );
+    draw_target.draw_glyphs(&font, FONT_SIZE, &char_ids, &char_positions, color, &NO_AA);
 }
 
 fn render_data(data: &FlightData) -> String {
@@ -140,7 +133,6 @@ fn render_data(data: &FlightData) -> String {
 }
 
 pub fn draw<'a>(
-    hwnd: HWND,
     config: &Config,
     data: &Option<FlightData>,
     draw_target: &'a mut DrawTarget,
@@ -177,7 +169,7 @@ pub fn draw<'a>(
                     "<   >",
                     Point::new(x - point_size * (3.0 / 4.0), y + point_size * (2.0 / 4.0)),
                     &color,
-                    &DRAW_OPTIONS,
+                    &NO_AA,
                 );
                 draw_target.draw_text(
                     default_font,
@@ -185,7 +177,7 @@ pub fn draw<'a>(
                     &dist,
                     Point::new(x - point_size * (1.0 / 4.0), y + point_size * (4.0 / 4.0)),
                     &color,
-                    &DRAW_OPTIONS,
+                    &NO_AA,
                 );
             }
         }
@@ -202,6 +194,8 @@ pub fn draw<'a>(
     } else {
         draw_text(draw_target, &default_font, &color, "Not Connected", offsets);
     }
+
+    symbols::display_gallery(draw_target, 64.0, 64.0);
 
     draw_target.get_data()
 }

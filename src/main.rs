@@ -5,6 +5,7 @@ mod consts;
 mod data;
 mod drawing;
 mod installer;
+mod symbols;
 mod windows;
 mod worker;
 

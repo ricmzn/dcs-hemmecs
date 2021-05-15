@@ -63,7 +63,7 @@ pub struct ControlWindow {
     #[nwg_layout_item(layout: grid, row: 3, col_span: 8)]
     settings_title: Label,
 
-    #[nwg_control(text: "Color")]
+    #[nwg_control(text: "Main Color")]
     #[nwg_layout_item(layout: grid, row: 4, col_span: 3)]
     color_label: Label,
 
