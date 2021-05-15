@@ -11,7 +11,6 @@ use crate::{
         TEXT_OFFSET_X, TEXT_OFFSET_Y,
     },
     data::{FlightData, UnitSystem},
-    windows::is_focused,
 };
 
 static WEAPON_CODE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?:\w+[-.])?(\w+)(?:\s.+)?").unwrap());
@@ -202,21 +201,6 @@ pub fn draw<'a>(
         draw_text(draw_target, &default_font, &color, &text, offsets);
     } else {
         draw_text(draw_target, &default_font, &color, "Not Connected", offsets);
-    }
-
-    // Paint window border in case it's in focus
-    if is_focused(hwnd) {
-        let mut pb = PathBuilder::new();
-        pb.rect(0.0, 0.0, HUD_WIDTH as f32, HUD_HEIGHT as f32);
-        draw_target.stroke(
-            &pb.finish(),
-            &red(),
-            &StrokeStyle {
-                width: 4.0,
-                ..Default::default()
-            },
-            &DRAW_OPTIONS,
-        );
     }
 
     draw_target.get_data()

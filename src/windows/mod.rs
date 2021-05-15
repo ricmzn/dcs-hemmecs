@@ -4,7 +4,7 @@ pub mod hmd_window;
 use std::ffi::CString;
 use std::ptr::null_mut as NULL;
 use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
-use winapi::um::winuser::{GetFocus, MessageBoxA, IDOK, MB_ICONERROR, MB_ICONINFORMATION};
+use winapi::um::winuser::{MessageBoxA, IDOK, MB_ICONERROR, MB_ICONINFORMATION};
 use winapi::{
     shared::windef::HWND,
     um::winuser::{GetSystemMetrics, SM_CXSCREEN, SM_CYSCREEN},
@@ -44,10 +44,6 @@ pub fn show_message_box(msg_type: MessageBoxType) -> bool {
         };
         MessageBoxA(NULL(), message.as_ptr(), title, flags) == IDOK
     }
-}
-
-pub fn is_focused(hwnd: HWND) -> bool {
-    unsafe { GetFocus() == hwnd }
 }
 
 /// Returns the dimensions of the primary display in the format: (width, height)
