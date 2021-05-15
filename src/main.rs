@@ -106,6 +106,7 @@ fn main() {
     // Pin the data to make sure the pointer we use later (in window_proc) can't point to a dropped value
     let state = Box::pin(ApplicationState {
         flight_data: RwLock::new(None),
+        radar_memory: RwLock::new(Default::default()),
         draw_target: RefCell::new(DrawTarget::new(screen_dimensions.0, screen_dimensions.1)),
         font: RefCell::new(default_font),
         config: Arc::clone(&config),
@@ -114,9 +115,10 @@ fn main() {
 
     // Use crossbeam's thread scope feature to keep lifetimes tidy as the worker threads don't need to run beyond the main thread
     let data_handle = &state.flight_data;
+    let radar_handle = &state.radar_memory;
     let thread_scope = scope(|scope| {
         // Create the worker thread
-        scope.spawn(|_| run_data_worker(data_handle, &quit_signal));
+        scope.spawn(|_| run_data_worker(data_handle, radar_handle, &quit_signal));
 
         // Create the two windows
         let control_window = windows::control_window::create().unwrap();

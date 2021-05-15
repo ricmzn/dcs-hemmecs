@@ -6,11 +6,12 @@ use std::sync::RwLock;
 use std::thread::sleep;
 use std::time::Duration;
 
-use crate::data::FlightData;
+use crate::data::{FlightData, RadarMemory};
 
 fn handle_data_connection(
     stream: TcpStream,
     data_handle: &RwLock<Option<FlightData>>,
+    radar_handle: &RwLock<RadarMemory>,
     quit_signal: &AtomicBool,
 ) -> io::Result<()> {
     stream.set_nodelay(true)?;
@@ -21,6 +22,7 @@ fn handle_data_connection(
         if let Some(line) = line {
             *data = Some(serde_json::from_str(&line?).unwrap());
         } else {
+            radar_handle.write().unwrap().targets.clear();
             *data = None;
             break;
         }
@@ -30,7 +32,11 @@ fn handle_data_connection(
     Ok(())
 }
 
-pub fn run_data_worker(data_handle: &RwLock<Option<FlightData>>, quit_signal: &AtomicBool) {
+pub fn run_data_worker(
+    data_handle: &RwLock<Option<FlightData>>,
+    radar_handle: &RwLock<RadarMemory>,
+    quit_signal: &AtomicBool,
+) {
     // Run thread while looking for possible panics
     if let Err(err) = catch_unwind(|| {
         println!("Waiting for mission start");
@@ -39,7 +45,9 @@ pub fn run_data_worker(data_handle: &RwLock<Option<FlightData>>, quit_signal: &A
                 // Connected to DCS
                 Ok(stream) => {
                     println!("Connected to DCS");
-                    if let Err(_) = handle_data_connection(stream, data_handle, quit_signal) {
+                    if let Err(_) =
+                        handle_data_connection(stream, data_handle, radar_handle, quit_signal)
+                    {
                         println!("Warning: DCS disconnected suddenly");
                     }
                 }

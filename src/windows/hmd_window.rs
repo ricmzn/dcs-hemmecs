@@ -35,7 +35,7 @@ const BMP_INFO: BITMAPINFO = BITMAPINFO {
 };
 
 unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lparam: isize) -> isize {
-    let data = GetWindowLongPtrA(hwnd, GWL_USERDATA) as *const Pin<Box<ApplicationState>>;
+    let state = GetWindowLongPtrA(hwnd, GWL_USERDATA) as *const Pin<Box<ApplicationState>>;
     match msg {
         WM_NCCREATE => {
             // Save the passed Mutex<WindowData> pointer into the user data field of the window
@@ -44,19 +44,19 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
             1
         }
         WM_PAINT => {
-            if let Some(data) = data.as_ref() {
+            if let Some(state) = state.as_ref() {
                 let mut ps: PAINTSTRUCT = std::mem::zeroed();
                 let hdc = BeginPaint(hwnd, &mut ps as *mut PAINTSTRUCT);
 
                 // Unpack the data fields
-                let mut draw_target = data.draw_target.borrow_mut();
-                let flight_data = { data.flight_data.read().unwrap().clone() };
-                let config = { data.config.lock().unwrap().clone() };
-                let (width, height) = data.screen_dimensions;
-                let font = data.font.borrow();
+                let mut draw_target = state.draw_target.borrow_mut();
+                let flight_data = { state.flight_data.read().unwrap().clone() };
+                let config = { state.config.lock().unwrap().clone() };
+                let (width, height) = state.screen_dimensions;
+                let font = state.font.borrow();
 
                 // Set the image blit size
-                // Note: the height is reversed because Raqote and Windows start at opposite points in the Y axis
+                // Note: the height is reversed because Raqote draws from the top left, but Windows draws from the bottom left
                 let mut bmp_info = BMP_INFO;
                 bmp_info.bmiHeader.biWidth = width;
                 bmp_info.bmiHeader.biHeight = -height;
@@ -75,8 +75,9 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
                     draw(
                         &config,
                         &flight_data,
+                        &mut state.radar_memory.write().unwrap(),
                         &mut draw_target,
-                        data.screen_dimensions,
+                        state.screen_dimensions,
                         &font,
                     ) as *const [u32] as *mut _,
                     &bmp_info,

@@ -1,10 +1,13 @@
 use font_kit::font::Font;
 use raqote::DrawTarget;
 use serde::Deserialize;
-use std::cell::RefCell;
 use std::sync::RwLock;
+use std::{cell::RefCell, collections::HashMap};
 
-use crate::config::{Config, ConfigHandle, Occlusion};
+use crate::{
+    config::{Config, ConfigHandle, Occlusion},
+    symbols::{Donor, Identification},
+};
 
 trait ToDegrees {
     fn to_degrees(&self) -> Self;
@@ -35,6 +38,7 @@ pub mod dcs {
         pub fn as_glm_vec3(&self) -> glm::Vec3 {
             glm::Vec3::new(self.x, self.y, self.z)
         }
+
         pub fn project(
             &self,
             screen_dimensions: (i32, i32),
@@ -146,6 +150,14 @@ pub mod dcs {
         pub id: i32,
         pub position: Position,
         pub distance: f32,
+        pub start_of_lock: f32,
+    }
+
+    #[derive(Debug, Clone, Default, Deserialize)]
+    #[serde(default)]
+    pub struct Wingman {
+        pub wingmen_id: i32,
+        pub wingmen_position: Position,
     }
 }
 
@@ -177,6 +189,7 @@ pub struct FlightData {
     pub engine_data: Option<dcs::EngineData>,
     pub weapons: Option<dcs::WeaponData>,
     pub targets: Vec<dcs::Target>,
+    pub wingmen: Vec<Option<dcs::Wingman>>,
     pub unit: String,
 }
 
@@ -283,8 +296,72 @@ impl FlightData {
 
 pub struct ApplicationState {
     pub flight_data: RwLock<Option<FlightData>>,
+    pub radar_memory: RwLock<RadarMemory>,
     pub draw_target: RefCell<DrawTarget>,
     pub font: RefCell<Font>,
     pub config: ConfigHandle,
     pub screen_dimensions: (i32, i32),
+}
+
+#[derive(Debug)]
+pub struct RadarTarget {
+    pub id: Option<i32>,
+    pub position: Option<dcs::Position>,
+    pub iff: Identification,
+    pub src: Donor,
+    pub last_seen: f32,
+    pub locked: bool,
+}
+
+#[derive(Default, Debug)]
+pub struct RadarMemory {
+    pub targets: HashMap<i32, RadarTarget>,
+}
+
+impl RadarMemory {
+    pub const MAX_AGE: f32 = 0.0;
+
+    pub fn update(&mut self, time: f32) {
+        self.targets
+            .retain(|_, target| time - target.last_seen <= Self::MAX_AGE);
+    }
+
+    pub fn add_target(&mut self, time: f32, target: &dcs::Target) {
+        self.targets
+            .entry(target.id)
+            .and_modify(|old| {
+                old.position = Some(target.position.clone());
+                old.src = Donor::Ownship;
+                old.last_seen = time;
+                old.locked = target.start_of_lock > 0.0;
+            })
+            .or_insert_with(|| RadarTarget {
+                id: Some(target.id),
+                position: Some(target.position.clone()),
+                iff: Identification::Unknown,
+                src: Donor::Ownship,
+                last_seen: time,
+                locked: target.start_of_lock > 0.0,
+            });
+    }
+
+    pub fn add_wingman(&mut self, time: f32, wingman: &dcs::Wingman) {
+        self.targets
+            .entry(wingman.wingmen_id)
+            .and_modify(|old| {
+                old.position = Some(wingman.wingmen_position.clone());
+                old.iff = Identification::Friendly;
+                old.src = Donor::Ownship;
+                old.last_seen = time;
+                old.locked = false;
+            })
+            .or_insert_with(|| RadarTarget {
+                id: Some(wingman.wingmen_id),
+                position: Some(wingman.wingmen_position.clone()),
+                iff: Identification::Friendly,
+                src: Donor::Datalink,
+                last_seen: time,
+                locked: false,
+            });
+    }
 }

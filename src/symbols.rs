@@ -3,12 +3,14 @@ use std::f32::consts::PI;
 
 use crate::consts::ANTI_ALIASED;
 
+#[derive(Debug)]
 pub enum Identification {
     Hostile,
     Friendly,
     Unknown,
 }
 
+#[derive(Debug)]
 pub enum Donor {
     Ownship,
     Datalink,
@@ -67,7 +69,7 @@ pub fn draw_symbol(
 
     let color = match iff {
         Identification::Hostile => Color::new(255, 192, 0, 0).into(),
-        Identification::Friendly => Color::new(255, 0, 192, 192).into(),
+        Identification::Friendly => Color::new(255, 0, 0, 192).into(),
         Identification::Unknown => Color::new(255, 192, 192, 0).into(),
     };
 
@@ -91,6 +93,7 @@ pub fn draw_symbol(
     draw_target.stroke(&shape, &color, &stroke, &ANTI_ALIASED);
 }
 
+#[allow(dead_code)]
 pub fn display_gallery(draw_target: &mut DrawTarget, x: f32, y: f32) {
     for (i, iff) in [
         Identification::Hostile,

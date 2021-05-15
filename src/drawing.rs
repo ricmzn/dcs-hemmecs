@@ -9,8 +9,8 @@ use crate::{
         background, rgb, FONT_SIZE, HUD_HEIGHT, HUD_WIDTH, NO_AA, TEXT_COLUMNS, TEXT_OFFSET_X,
         TEXT_OFFSET_Y,
     },
-    data::{FlightData, UnitSystem},
-    symbols::{self},
+    data::{FlightData, RadarMemory, UnitSystem},
+    symbols::draw_symbol,
 };
 
 static WEAPON_CODE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?:\w+[-.])?(\w+)(?:\s.+)?").unwrap());
@@ -135,6 +135,7 @@ fn render_data(data: &FlightData) -> String {
 pub fn draw<'a>(
     config: &Config,
     data: &Option<FlightData>,
+    radar_memory: &mut RadarMemory,
     draw_target: &'a mut DrawTarget,
     screen_dimensions: (i32, i32),
     default_font: &Font,
@@ -155,47 +156,48 @@ pub fn draw<'a>(
         draw_text(draw_target, &default_font, &color, &sample_data, offsets);
     } else if let Some(data) = data {
         let cockpit_params = data.parse_cockpit_params().unwrap_or_default();
-        let camera_angles = data.camera_angles();
 
-        // Radar targets
-        for target in &data.targets {
-            let point_size = 24.0;
-            let position = target.position.p.project(screen_dimensions, &data.cam);
-            let dist = (target.distance / 1852.0).round().to_string();
-            if let Some((x, y)) = position {
-                draw_target.draw_text(
-                    default_font,
-                    point_size,
-                    "<   >",
-                    Point::new(x - point_size * (3.0 / 4.0), y + point_size * (2.0 / 4.0)),
-                    &color,
-                    &NO_AA,
-                );
-                draw_target.draw_text(
-                    default_font,
-                    point_size,
-                    &dist,
-                    Point::new(x - point_size * (1.0 / 4.0), y + point_size * (4.0 / 4.0)),
-                    &color,
-                    &NO_AA,
-                );
-            }
-        }
-
+        // Cancel drawing if the pilot has ejected
         let text = if cockpit_params.ejected {
-            String::from("YEET")
-        } else if FlightData::is_occluded(camera_angles, &config) {
-            String::from("*")
+            String::new()
         } else {
-            render_data(&data)
+            radar_memory.update(data.time);
+
+            for wingman in &data.wingmen {
+                if let Some(wingman) = wingman {
+                    radar_memory.add_wingman(data.time, wingman);
+                }
+            }
+
+            for target in &data.targets {
+                radar_memory.add_target(data.time, target);
+            }
+
+            // Draw radar targets
+            for (_, target) in &radar_memory.targets {
+                if let Some((x, y)) = &target
+                    .position
+                    .as_ref()
+                    .map(|pos| pos.p.project(screen_dimensions, &data.cam))
+                    .flatten()
+                {
+                    draw_symbol(draw_target, *x, *y, &target.iff, &target.src, target.locked);
+                }
+            }
+
+            // Decide whether to also draw the rest of the HMD data based on if the user is looking at an
+            // occluded area (ie. inside of the cockpit), if they have enabled occlusion
+            if FlightData::is_occluded(data.camera_angles(), &config) {
+                String::new()
+            } else {
+                render_data(&data)
+            }
         };
 
         draw_text(draw_target, &default_font, &color, &text, offsets);
     } else {
         draw_text(draw_target, &default_font, &color, "Not Connected", offsets);
     }
-
-    symbols::display_gallery(draw_target, 64.0, 64.0);
 
     draw_target.get_data()
 }

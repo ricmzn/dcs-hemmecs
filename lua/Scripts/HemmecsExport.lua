@@ -66,6 +66,8 @@ local function exportData()
         cam = LoGetCameraPosition(),
         engine_data = LoGetEngineInfo(),
         targets = LoGetTargetInformation(),
+        wingmen = LoGetWingInfo(),
+        datalink = LoGetWingTargets(),
         unit = player.Name,
         weapons = weapons
     })
