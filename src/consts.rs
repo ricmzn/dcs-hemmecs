@@ -8,20 +8,14 @@ pub const TEXT_OFFSET_Y: f32 = FONT_SIZE * 5.0 / 6.0;
 pub const TEXT_COLUMNS: i32 = (HUD_WIDTH as f32 / (FONT_SIZE / 2.0)) as i32;
 pub static DEFAULT_FONT: &[u8] = include_bytes!("../fonts/Inconsolata-SemiBold.ttf");
 
-pub static NO_AA: DrawOptions = DrawOptions {
-    antialias: AntialiasMode::None,
-    blend_mode: BlendMode::Src,
-    alpha: 1.0,
-};
-
 pub static ANTI_ALIASED: DrawOptions = DrawOptions {
     antialias: AntialiasMode::Gray,
-    blend_mode: BlendMode::Src,
+    blend_mode: BlendMode::SrcOver,
     alpha: 1.0,
 };
 
 pub fn background() -> SolidSource {
-    Color::new(255, 0, 0, 0).into()
+    Color::new(0, 0, 0, 0).into()
 }
 
 pub fn rgb(rgb: (u8, u8, u8)) -> Source<'static> {

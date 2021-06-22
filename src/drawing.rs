@@ -6,8 +6,8 @@ use regex::Regex;
 use crate::{
     config::Config,
     consts::{
-        background, rgb, FONT_SIZE, HUD_HEIGHT, HUD_WIDTH, NO_AA, TEXT_COLUMNS, TEXT_OFFSET_X,
-        TEXT_OFFSET_Y,
+        background, rgb, ANTI_ALIASED, FONT_SIZE, HUD_HEIGHT, HUD_WIDTH, TEXT_COLUMNS,
+        TEXT_OFFSET_X, TEXT_OFFSET_Y,
     },
     data::{FlightData, RadarMemory, UnitSystem},
     symbols::draw_symbol,
@@ -57,7 +57,14 @@ fn draw_text(
         })
         .collect::<Vec<_>>();
 
-    draw_target.draw_glyphs(&font, FONT_SIZE, &char_ids, &char_positions, color, &NO_AA);
+    draw_target.draw_glyphs(
+        &font,
+        FONT_SIZE,
+        &char_ids,
+        &char_positions,
+        color,
+        &ANTI_ALIASED,
+    );
 }
 
 fn render_data(data: &FlightData) -> String {

@@ -1,4 +1,5 @@
 use std::ffi::CString;
+use std::mem::zeroed;
 use std::pin::Pin;
 use std::ptr::null_mut as NULL;
 use winapi::shared::windef::*;
@@ -12,7 +13,7 @@ use crate::ApplicationState;
 
 const REFRESH_TIMER: usize = 1;
 
-const BMP_INFO: BITMAPINFO = BITMAPINFO {
+static mut BMP_INFO: BITMAPINFO = BITMAPINFO {
     bmiColors: [RGBQUAD {
         rgbRed: 0xff,
         rgbGreen: 0xff,
@@ -43,10 +44,11 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
             SetWindowLongPtrA(hwnd, GWL_USERDATA, data.lpCreateParams as isize);
             1
         }
+        WM_CREATE => window_proc(hwnd, WM_PAINT, 0, 0),
         WM_PAINT => {
             if let Some(state) = state.as_ref() {
-                let mut ps: PAINTSTRUCT = std::mem::zeroed();
-                let hdc = BeginPaint(hwnd, &mut ps as *mut PAINTSTRUCT);
+                let mut ps: PAINTSTRUCT = zeroed();
+                let window_hdc = BeginPaint(hwnd, &mut ps as *mut PAINTSTRUCT);
 
                 // Unpack the data fields
                 let mut draw_target = state.draw_target.borrow_mut();
@@ -57,40 +59,66 @@ unsafe extern "system" fn window_proc(hwnd: HWND, msg: u32, wparam: usize, lpara
 
                 // Set the image blit size
                 // Note: the height is reversed because Raqote draws from the top left, but Windows draws from the bottom left
-                let mut bmp_info = BMP_INFO;
-                bmp_info.bmiHeader.biWidth = width;
-                bmp_info.bmiHeader.biHeight = -height;
+                BMP_INFO.bmiHeader.biWidth = width;
+                BMP_INFO.bmiHeader.biHeight = -height;
 
-                // Copy image data to window
-                StretchDIBits(
-                    hdc,
+                // Set up the drawing context for the transparent bitmap
+                let target_hdc = CreateCompatibleDC(window_hdc);
+                let target_bmp = CreateCompatibleBitmap(window_hdc, width, height);
+                SelectObject(target_hdc, target_bmp as _);
+
+                let mut point = POINT { x: 0, y: 0 };
+                let mut size = SIZE {
+                    cx: width,
+                    cy: height,
+                };
+                let mut blend = BLENDFUNCTION {
+                    BlendOp: AC_SRC_OVER,
+                    BlendFlags: 0,
+                    SourceConstantAlpha: config.appearance.brightness,
+                    AlphaFormat: AC_SRC_ALPHA,
+                };
+
+                let pixels = draw(
+                    &config,
+                    &flight_data,
+                    &mut state.radar_memory.write().unwrap(),
+                    &mut draw_target,
+                    state.screen_dimensions,
+                    &font,
+                );
+
+                // Copy image data to the new bitmap
+                SetDIBitsToDevice(
+                    target_hdc,
                     0,
                     0,
-                    width,
-                    height,
+                    width as u32,
+                    height as u32,
                     0,
                     0,
-                    width,
-                    height,
-                    draw(
-                        &config,
-                        &flight_data,
-                        &mut state.radar_memory.write().unwrap(),
-                        &mut draw_target,
-                        state.screen_dimensions,
-                        &font,
-                    ) as *const [u32] as *mut _,
-                    &bmp_info,
+                    0,
+                    height as u32,
+                    pixels.as_ptr() as *const _ as *mut _,
+                    &mut BMP_INFO as *mut _,
                     DIB_RGB_COLORS,
-                    SRCCOPY,
                 );
 
-                SetLayeredWindowAttributes(
+                // Set window to use the transparent image
+                UpdateLayeredWindow(
                     hwnd,
+                    NULL(),
+                    NULL(),
+                    &mut size as _,
+                    target_hdc,
+                    &mut point as _,
                     0,
-                    config.appearance.brightness,
-                    LWA_ALPHA | LWA_COLORKEY,
+                    &mut blend as _,
+                    ULW_ALPHA,
                 );
+
+                // Restore old objects, clean up, and finish
+                DeleteDC(target_hdc);
                 EndPaint(hwnd, &mut ps as *mut PAINTSTRUCT);
             }
 
@@ -140,7 +168,7 @@ pub fn create(window_data: &Pin<Box<ApplicationState>>, parent: HWND) -> HWND {
             WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TRANSPARENT,
             class_name.as_ptr(),
             title.as_ptr(),
-            WS_VISIBLE | WS_CHILD | WS_POPUP,
+            WS_POPUP | WS_VISIBLE,
             0,
             0,
             screen_width,
@@ -155,7 +183,6 @@ pub fn create(window_data: &Pin<Box<ApplicationState>>, parent: HWND) -> HWND {
             let err = GetLastError();
             panic!("Could not create window - Error code: 0x{:08x}", err);
         }
-        SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA | LWA_COLORKEY);
         hwnd
     }
 }
